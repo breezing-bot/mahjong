@@ -1,0 +1,14 @@
+{
+  "name": "mahjong",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "vision:dev": "pnpm --filter sparrow-vision tauri dev",
+    "vision:build": "pnpm --filter sparrow-vision tauri build",
+    "vision:preview": "pnpm --filter sparrow-vision preview",
+    "mark:dev": "pnpm --filter sparrow-mark tauri dev",
+    "mark:build": "pnpm --filter sparrow-mark tauri build",
+    "mark:preview": "pnpm --filter sparrow-mark preview"
+  }
+}

@@ -1,0 +1,6 @@
+[workspace]
+resolver = "2"
+members = [
+  "sparrow-vision/src-tauri",
+  "ml/sparrow-mark/src-tauri",
+]
