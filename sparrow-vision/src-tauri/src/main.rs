@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    sparrow_vision_lib::run()
+  sparrow_vision_lib::run()
 }
