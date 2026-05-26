@@ -27,7 +27,7 @@ pub struct RecognitionDiagnostics {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RecognitionResultV1 {
+pub struct RecognitionResult {
     pub detections: Vec<Detection>,
     pub hand_tiles: Vec<TileId>,
     pub quality_flags: Vec<String>,
@@ -84,7 +84,7 @@ pub struct SpecialWinInput {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AnalyzeHandRequestV1 {
+pub struct AnalyzeHandRequest {
     pub hand_tiles: Vec<TileId>,
     pub winning_tile: Option<TileId>,
     pub melds: Vec<MeldInput>,
@@ -119,7 +119,7 @@ pub struct ScoreBreakdown {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScoringResultV1 {
+pub struct ScoringResult {
     pub is_win: bool,
     pub yaku: Vec<YakuResult>,
     pub han: u8,

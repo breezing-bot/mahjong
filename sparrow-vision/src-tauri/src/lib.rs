@@ -1,5 +1,6 @@
 mod commands;
-mod rules;
+mod scoring;
+mod tile_vocab;
 mod types;
 mod vision;
 

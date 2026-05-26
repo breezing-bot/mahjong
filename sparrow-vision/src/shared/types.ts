@@ -58,7 +58,7 @@ export interface Detection {
   bbox: BBox;
 }
 
-export interface RecognitionResultV1 {
+export interface RecognitionResult {
   detections: Detection[];
   hand_tiles: TileId[];
   quality_flags: string[];
@@ -90,7 +90,7 @@ export interface SpecialWinInput {
   first_turn_tsumo: boolean;
 }
 
-export interface AnalyzeHandRequestV1 {
+export interface AnalyzeHandRequest {
   hand_tiles: TileId[];
   winning_tile: TileId | null;
   melds: MeldInput[];
@@ -104,7 +104,7 @@ export interface AnalyzeHandRequestV1 {
   ura_dora_indicators: TileId[];
 }
 
-export interface ScoringResultV1 {
+export interface ScoringResult {
   is_win: boolean;
   yaku: Array<{ id: string; name: string; han: number }>;
   han: number;

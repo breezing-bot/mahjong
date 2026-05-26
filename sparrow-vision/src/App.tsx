@@ -6,14 +6,14 @@ import { ScoringPanel } from "./features/scoring/ScoringPanel";
 import { ImageUpload } from "./features/upload/ImageUpload";
 import { analyzeHand, recognizeImage } from "./shared/api";
 import type {
-  AnalyzeHandRequestV1,
+  AnalyzeHandRequest,
   MeldInput,
-  RecognitionResultV1,
-  ScoringResultV1,
+  RecognitionResult,
+  ScoringResult,
   TileId,
 } from "./shared/types";
 
-const DEFAULT_REQUEST: AnalyzeHandRequestV1 = {
+const DEFAULT_REQUEST: AnalyzeHandRequest = {
   hand_tiles: [],
   winning_tile: null,
   melds: [],
@@ -36,10 +36,10 @@ const DEFAULT_REQUEST: AnalyzeHandRequestV1 = {
 
 function App() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [recognition, setRecognition] = useState<RecognitionResultV1 | null>(null);
-  const [request, setRequest] = useState<AnalyzeHandRequestV1>(DEFAULT_REQUEST);
+  const [recognition, setRecognition] = useState<RecognitionResult | null>(null);
+  const [request, setRequest] = useState<AnalyzeHandRequest>(DEFAULT_REQUEST);
   const [pendingTiles, setPendingTiles] = useState<TileId[]>([]);
-  const [result, setResult] = useState<ScoringResultV1 | null>(null);
+  const [result, setResult] = useState<ScoringResult | null>(null);
   const [busy, setBusy] = useState<"idle" | "recognizing" | "scoring">("idle");
 
   const status = useMemo(() => {

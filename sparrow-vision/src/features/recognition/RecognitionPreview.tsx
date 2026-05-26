@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import type { Detection, RecognitionResultV1 } from "../../shared/types";
+import type { Detection, RecognitionResult } from "../../shared/types";
 import { tileLabel } from "../../shared/tiles";
 
 interface RecognitionPreviewProps {
   imageUrl: string | null;
-  recognition: RecognitionResultV1 | null;
+  recognition: RecognitionResult | null;
 }
 
 export function RecognitionPreview({

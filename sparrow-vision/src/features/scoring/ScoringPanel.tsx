@@ -1,7 +1,7 @@
 import type {
-  AnalyzeHandRequestV1,
+  AnalyzeHandRequest,
   RiichiInput,
-  ScoringResultV1,
+  ScoringResult,
   TileId,
   WindInput,
   WinMethodInput,
@@ -10,10 +10,10 @@ import { TileBadge } from "../../shared/TileBadge";
 import { TILE_IDS, tileLabel, WIND_OPTIONS } from "../../shared/tiles";
 
 interface ScoringPanelProps {
-  request: AnalyzeHandRequestV1;
-  result: ScoringResultV1 | null;
+  request: AnalyzeHandRequest;
+  result: ScoringResult | null;
   busy: boolean;
-  onChange: (request: AnalyzeHandRequestV1) => void;
+  onChange: (request: AnalyzeHandRequest) => void;
   onAnalyze: () => void;
 }
 
@@ -192,7 +192,7 @@ function IndicatorEditor({
   );
 }
 
-function ResultView({ result }: { result: ScoringResultV1 | null }) {
+function ResultView({ result }: { result: ScoringResult | null }) {
   if (!result) {
     return <div className="result-empty">等待计算</div>;
   }
