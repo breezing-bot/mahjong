@@ -1,4 +1,4 @@
-use crate::types::ScoringResult;
+use crate::types::{ScoreBreakdown, ScoringResult, TsumoPoints};
 use riichi_calc::calculator::result::Points;
 use riichi_calc::constants::status::WinMethod;
 use riichi_calc::finder::result::FoundResult;
@@ -44,6 +44,27 @@ pub fn result_rank(result: &ScoringResult) -> u32 {
     .as_ref()
     .map(|tsumo| tsumo.dealer + tsumo.non_dealer * 2)
     .unwrap_or(0)
+}
+
+pub fn score_breakdown(points: &Points, fu: u8, han: u8, is_yakuman: bool) -> ScoreBreakdown {
+  ScoreBreakdown {
+    base_points: base_points(fu, han, is_yakuman),
+    ron_points: match points {
+      Points::Ron(value) => *value,
+      _ => 0,
+    },
+    tsumo_points: match points {
+      Points::ChildTumo(non_dealer, dealer) => Some(TsumoPoints {
+        dealer: *dealer,
+        non_dealer: *non_dealer,
+      }),
+      Points::DealerTumo(value) => Some(TsumoPoints {
+        dealer: *value,
+        non_dealer: *value,
+      }),
+      Points::Ron(_) => None,
+    },
+  }
 }
 
 fn round_points(points: u32) -> u32 {

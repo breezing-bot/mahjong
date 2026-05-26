@@ -37,6 +37,7 @@ fn load_onnx_model(app: &AppHandle, input_size: u32) -> Result<VisionModel, Stri
 
 fn model_path(app: &AppHandle) -> PathBuf {
   let resource_path = app.path().resolve("model/last.onnx", BaseDirectory::Resource);
+  println!("尝试加载模型路径：{:?}", resource_path);
   if let Ok(path) = resource_path {
     if path.exists() {
       return path;
