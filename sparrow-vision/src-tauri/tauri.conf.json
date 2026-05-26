@@ -24,6 +24,9 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "resources": {
+      "../../ml/model/last.onnx": "model/last.onnx"
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
