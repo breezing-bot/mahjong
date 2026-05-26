@@ -45,8 +45,8 @@ Backend code lives in `sparrow-vision/src-tauri/src/`.
 
 - `commands.rs`: thin Tauri command layer.
 - `types.rs`: serializable DTOs aligned with `shared/specs`.
-- `vision.rs`: image preprocessing, ONNX inference, YOLO output parsing, NMS, hand grouping.
-- `rules.rs`: tile mapping, validation, dora conversion, `riichi-calc` adapter.
+- `vision/`: image preprocessing, ONNX inference, YOLO output parsing, result assembly, and hand grouping.
+- `scoring/`: tile mapping, validation, dora conversion, and `riichi-calc` adapter.
 
 Recognition model details:
 
@@ -54,6 +54,13 @@ Recognition model details:
 - Tauri bundles it as a resource at `model/last.onnx`.
 - Development may fall back to the repo path.
 - The model is large; keep model/session loading cached and avoid reloading per upload.
+- The current YOLO26 ONNX output is post-processed detection rows with shape `[1, N, 6]`.
+- Detection rows are `x1, y1, x2, y2, confidence, class_id` in model letterbox coordinates.
+- Backend maps model `x1/y1/x2/y2` back to original image pixels and exposes `bbox` as `x, y, width, height`.
+- The YOLO26 model already applies NMS. Do not add backend NMS unless the model export changes.
+- Recognition debug fixture images live in `sparrow-vision/src-tauri/tests/fixtures/recognition/images/`.
+- Ignored debug tests in `vision/recognizer.rs` can print model output, print assembled `RecognitionResult`, or save an annotated image.
+- Debug annotated images must be written to the system temp directory, not into fixture directories.
 
 Scoring details:
 
