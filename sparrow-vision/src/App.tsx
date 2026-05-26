@@ -85,7 +85,6 @@ function App() {
           kept_detection_count: 0,
           dropped_low_confidence_count: 0,
           dropped_unknown_class_count: 0,
-          dropped_duplicate_count: 0,
         },
       });
       setResult({

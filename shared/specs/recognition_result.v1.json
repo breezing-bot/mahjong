@@ -62,8 +62,6 @@
         "enum": [
           "low_confidence_filtered",
           "unknown_class_index",
-          "duplicate_tile_suppressed",
-          "trimmed_to_max_detections",
           "empty_model_output",
           "model_unavailable"
         ]
@@ -76,15 +74,13 @@
         "raw_detection_count",
         "kept_detection_count",
         "dropped_low_confidence_count",
-        "dropped_unknown_class_count",
-        "dropped_duplicate_count"
+        "dropped_unknown_class_count"
       ],
       "properties": {
         "raw_detection_count": { "type": "integer", "minimum": 0 },
         "kept_detection_count": { "type": "integer", "minimum": 0 },
         "dropped_low_confidence_count": { "type": "integer", "minimum": 0 },
-        "dropped_unknown_class_count": { "type": "integer", "minimum": 0 },
-        "dropped_duplicate_count": { "type": "integer", "minimum": 0 }
+        "dropped_unknown_class_count": { "type": "integer", "minimum": 0 }
       }
     }
   }

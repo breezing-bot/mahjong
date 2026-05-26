@@ -23,7 +23,6 @@ pub struct RecognitionDiagnostics {
   pub kept_detection_count: usize,
   pub dropped_low_confidence_count: usize,
   pub dropped_unknown_class_count: usize,
-  pub dropped_duplicate_count: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

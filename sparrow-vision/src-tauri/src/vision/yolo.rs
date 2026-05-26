@@ -1,19 +1,21 @@
 use super::preprocess::Letterbox;
 use crate::tile_vocab::TILE_IDS;
-use crate::types::{BBox, RecognitionDiagnostics};
-use std::cmp::Ordering;
+use crate::types::{BBox, Detection, RecognitionDiagnostics};
 use tract_onnx::prelude::tract_ndarray::ArrayViewD;
 
-#[derive(Debug, Clone)]
-pub struct RawDetection {
-  pub tile_id: String,
-  pub confidence: f32,
-  pub bbox: BBox,
+#[derive(Debug, Clone, Copy)]
+struct DetectionRow {
+  x1: f32,
+  y1: f32,
+  x2: f32,
+  y2: f32,
+  confidence: f32,
+  class_id: f32,
 }
 
 pub fn parse_output(
   output: &ArrayViewD<f32>, letterbox: &Letterbox, confidence_threshold: f32,
-) -> (Vec<RawDetection>, RecognitionDiagnostics) {
+) -> (Vec<Detection>, RecognitionDiagnostics) {
   let shape = output.shape();
   let mut candidates = Vec::new();
   let mut diagnostics = empty_diagnostics();
@@ -22,15 +24,18 @@ pub fn parse_output(
     return (candidates, diagnostics);
   }
 
-  let Some(layout) = OutputLayout::from_shape(shape) else {
+  if shape[2] != 6 {
     return (candidates, diagnostics);
-  };
-  let prediction_count = layout.prediction_count(shape);
+  }
+
+  let prediction_count = shape[1];
   diagnostics.raw_detection_count = prediction_count;
 
   for index in 0..prediction_count {
-    let values = prediction_values(output, index, layout);
-    let (class_index, confidence) = best_class(&values);
+    let Some((class_index, confidence, bbox_values)) = candidate_from_output(output, index) else {
+      diagnostics.dropped_unknown_class_count += 1;
+      continue;
+    };
     if confidence < confidence_threshold {
       diagnostics.dropped_low_confidence_count += 1;
       continue;
@@ -41,77 +46,52 @@ pub fn parse_output(
       continue;
     };
 
-    candidates.push(RawDetection {
+    candidates.push(Detection {
       tile_id: tile_id.to_string(),
       confidence,
-      bbox: remap_bbox(values[0], values[1], values[2], values[3], letterbox),
+      bbox: remap_corners_bbox(
+        bbox_values[0],
+        bbox_values[1],
+        bbox_values[2],
+        bbox_values[3],
+        letterbox,
+      ),
     });
   }
 
   (candidates, diagnostics)
 }
 
-#[derive(Debug, Clone, Copy)]
-enum OutputLayout {
-  PredictionsByRow,
-  ValuesByRow,
+fn candidate_from_output(output: &ArrayViewD<f32>, index: usize) -> Option<(usize, f32, [f32; 4])> {
+  let row = DetectionRow::from_output(output, index);
+  if !row.class_id.is_finite() || row.class_id < 0.0 {
+    return None;
+  }
+  Some((
+    row.class_id.round() as usize,
+    row.confidence,
+    [row.x1, row.y1, row.x2, row.y2],
+  ))
 }
 
-impl OutputLayout {
-  fn from_shape(shape: &[usize]) -> Option<Self> {
-    let value_count = TILE_IDS.len() + 4;
-    if shape[2] == value_count {
-      Some(Self::PredictionsByRow)
-    } else if shape[1] == value_count {
-      Some(Self::ValuesByRow)
-    } else {
-      None
-    }
-  }
-
-  fn prediction_count(self, shape: &[usize]) -> usize {
-    match self {
-      Self::PredictionsByRow => shape[1],
-      Self::ValuesByRow => shape[2],
-    }
-  }
-
-  fn value_count(self, shape: &[usize]) -> usize {
-    match self {
-      Self::PredictionsByRow => shape[2],
-      Self::ValuesByRow => shape[1],
+impl DetectionRow {
+  fn from_output(output: &ArrayViewD<f32>, index: usize) -> Self {
+    Self {
+      x1: output[[0, index, 0]],
+      y1: output[[0, index, 1]],
+      x2: output[[0, index, 2]],
+      y2: output[[0, index, 3]],
+      confidence: output[[0, index, 4]],
+      class_id: output[[0, index, 5]],
     }
   }
 }
 
-fn prediction_values(output: &ArrayViewD<f32>, index: usize, layout: OutputLayout) -> Vec<f32> {
-  let shape = output.shape();
-  let value_count = layout.value_count(shape);
-  let mut values = Vec::with_capacity(value_count);
-  for value_index in 0..value_count {
-    let value = match layout {
-      OutputLayout::PredictionsByRow => output[[0, index, value_index]],
-      OutputLayout::ValuesByRow => output[[0, value_index, index]],
-    };
-    values.push(value);
-  }
-  values
-}
-
-fn best_class(values: &[f32]) -> (usize, f32) {
-  values[4..]
-    .iter()
-    .enumerate()
-    .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(Ordering::Equal))
-    .map(|(idx, value)| (idx, *value))
-    .unwrap_or((usize::MAX, 0.0))
-}
-
-fn remap_bbox(cx: f32, cy: f32, width: f32, height: f32, letterbox: &Letterbox) -> BBox {
-  let x1 = ((cx - width / 2.0) - letterbox.pad_x) / letterbox.scale;
-  let y1 = ((cy - height / 2.0) - letterbox.pad_y) / letterbox.scale;
-  let x2 = ((cx + width / 2.0) - letterbox.pad_x) / letterbox.scale;
-  let y2 = ((cy + height / 2.0) - letterbox.pad_y) / letterbox.scale;
+fn remap_corners_bbox(x1: f32, y1: f32, x2: f32, y2: f32, letterbox: &Letterbox) -> BBox {
+  let x1 = (x1 - letterbox.pad_x) / letterbox.scale;
+  let y1 = (y1 - letterbox.pad_y) / letterbox.scale;
+  let x2 = (x2 - letterbox.pad_x) / letterbox.scale;
+  let y2 = (y2 - letterbox.pad_y) / letterbox.scale;
   let x1 = x1.clamp(0.0, letterbox.original_width);
   let y1 = y1.clamp(0.0, letterbox.original_height);
   let x2 = x2.clamp(0.0, letterbox.original_width);
@@ -131,7 +111,6 @@ fn empty_diagnostics() -> RecognitionDiagnostics {
     kept_detection_count: 0,
     dropped_low_confidence_count: 0,
     dropped_unknown_class_count: 0,
-    dropped_duplicate_count: 0,
   }
 }
 
@@ -152,7 +131,7 @@ mod tests {
 
   #[test]
   fn remaps_bbox_from_letterbox_to_original_pixels() {
-    let bbox = remap_bbox(320.0, 640.0, 64.0, 80.0, &letterbox());
+    let bbox = remap_corners_bbox(288.0, 600.0, 352.0, 680.0, &letterbox());
 
     assert_eq!(bbox.x, 144.0);
     assert_eq!(bbox.y, 140.0);
@@ -161,63 +140,50 @@ mod tests {
   }
 
   #[test]
-  fn parses_prediction_rows_layout() {
-    let mut output = Array::zeros((1, 1, TILE_IDS.len() + 4));
-    output[[0, 0, 0]] = 320.0;
-    output[[0, 0, 1]] = 640.0;
-    output[[0, 0, 2]] = 64.0;
-    output[[0, 0, 3]] = 80.0;
-    output[[0, 0, 5]] = 0.9;
+  fn parses_detection_rows() {
+    let mut output = Array::zeros((1, 300, 6));
+    output[[0, 7, 0]] = 288.0;
+    output[[0, 7, 1]] = 600.0;
+    output[[0, 7, 2]] = 352.0;
+    output[[0, 7, 3]] = 680.0;
+    output[[0, 7, 4]] = 0.9;
+    output[[0, 7, 5]] = 3.0;
 
     let (detections, diagnostics) = parse_output(&output.into_dyn().view(), &letterbox(), 0.25);
 
-    assert_eq!(diagnostics.raw_detection_count, 1);
-    assert_eq!(detections.len(), 1);
-    assert_eq!(detections[0].tile_id, "m1");
-  }
-
-  #[test]
-  fn parses_channel_rows_layout() {
-    let mut output = Array::zeros((1, TILE_IDS.len() + 4, 1));
-    output[[0, 0, 0]] = 320.0;
-    output[[0, 1, 0]] = 640.0;
-    output[[0, 2, 0]] = 64.0;
-    output[[0, 3, 0]] = 80.0;
-    output[[0, 6, 0]] = 0.9;
-
-    let (detections, diagnostics) = parse_output(&output.into_dyn().view(), &letterbox(), 0.25);
-
-    assert_eq!(diagnostics.raw_detection_count, 1);
-    assert_eq!(detections.len(), 1);
-    assert_eq!(detections[0].tile_id, "m2");
-  }
-
-  #[test]
-  fn parses_many_channel_first_predictions() {
-    let mut output = Array::zeros((1, TILE_IDS.len() + 4, 8400));
-    output[[0, 0, 99]] = 320.0;
-    output[[0, 1, 99]] = 640.0;
-    output[[0, 2, 99]] = 64.0;
-    output[[0, 3, 99]] = 80.0;
-    output[[0, 7, 99]] = 0.9;
-
-    let (detections, diagnostics) = parse_output(&output.into_dyn().view(), &letterbox(), 0.25);
-
-    assert_eq!(diagnostics.raw_detection_count, 8400);
+    assert_eq!(diagnostics.raw_detection_count, 300);
+    assert_eq!(diagnostics.dropped_low_confidence_count, 299);
     assert_eq!(detections.len(), 1);
     assert_eq!(detections[0].tile_id, "m3");
+    assert_eq!(detections[0].confidence, 0.9);
+    assert_eq!(detections[0].bbox.x, 144.0);
+    assert_eq!(detections[0].bbox.y, 140.0);
+    assert_eq!(detections[0].bbox.width, 32.0);
+    assert_eq!(detections[0].bbox.height, 40.0);
   }
 
   #[test]
   fn counts_low_confidence_predictions() {
-    let mut output = Array::zeros((1, 2, TILE_IDS.len() + 4));
+    let mut output = Array::zeros((1, 2, 6));
     output[[0, 0, 4]] = 0.1;
+    output[[0, 0, 5]] = 1.0;
     output[[0, 1, 4]] = 0.2;
+    output[[0, 1, 5]] = 2.0;
 
     let (detections, diagnostics) = parse_output(&output.into_dyn().view(), &letterbox(), 0.25);
 
     assert!(detections.is_empty());
     assert_eq!(diagnostics.dropped_low_confidence_count, 2);
     assert_eq!(diagnostics.dropped_unknown_class_count, 0);
+  }
+
+  #[test]
+  fn ignores_unsupported_output_shape() {
+    let output = Array::zeros((1, TILE_IDS.len() + 4, 8400));
+
+    let (detections, diagnostics) = parse_output(&output.into_dyn().view(), &letterbox(), 0.25);
+
+    assert!(detections.is_empty());
+    assert_eq!(diagnostics.raw_detection_count, 0);
   }
 }

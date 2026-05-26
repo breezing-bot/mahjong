@@ -1,4 +1,4 @@
-use super::{hand, model, nms, output, preprocess, yolo};
+use super::{hand, model, output, preprocess, yolo};
 use crate::types::RecognitionResult;
 use tauri::AppHandle;
 use tract_onnx::prelude::*;
@@ -13,16 +13,10 @@ pub fn recognize_image(image_bytes: &[u8], app: &AppHandle) -> Result<Recognitio
   let outputs = model.run(tvec!(tensor.into())).map_err(|err| err.to_string())?;
   let output = outputs[0].to_array_view::<f32>().map_err(|err| err.to_string())?;
 
-  let (raw, mut diagnostics) = yolo::parse_output(&output, &letterbox, super::CONFIDENCE_THRESHOLD);
-  let nms = nms::suppress_overlaps(raw, super::NMS_IOU_THRESHOLD, super::MAX_DETECTIONS, &mut diagnostics);
-  let hand_tiles = hand::infer_hand_tiles(&nms.detections);
+  let (detections, diagnostics) = yolo::parse_output(&output, &letterbox, super::CONFIDENCE_THRESHOLD);
+  let hand_tiles = hand::infer_hand_tiles(&detections);
 
-  Ok(output::recognition_result(
-    nms.detections,
-    hand_tiles,
-    diagnostics,
-    nms.trimmed_to_max,
-  ))
+  Ok(output::recognition_result(detections, hand_tiles, diagnostics))
 }
 
 pub fn recognize_image_or_unavailable(image_bytes: &[u8], app: &AppHandle) -> RecognitionResult {
@@ -32,9 +26,12 @@ pub fn recognize_image_or_unavailable(image_bytes: &[u8], app: &AppHandle) -> Re
 #[cfg(test)]
 mod debug_tests {
   use super::*;
+  use crate::types::{BBox, Detection};
+  use image::{Rgb, RgbImage};
   use std::env;
   use std::fs;
   use std::path::{Path, PathBuf};
+  use tract_onnx::prelude::tract_ndarray::{ArrayD, ArrayViewD};
 
   #[test]
   #[ignore = "set SPARROW_VISION_DEBUG_IMAGE to an image path and run with --ignored --nocapture"]
@@ -44,40 +41,18 @@ mod debug_tests {
       return;
     };
 
-    let image_bytes =
-      fs::read(&image_path).unwrap_or_else(|err| panic!("failed to read {}: {err}", image_path.display()));
-    let image = image::load_from_memory(&image_bytes)
-      .unwrap_or_else(|err| panic!("failed to decode {}: {err}", image_path.display()));
-    let (input, letterbox) = preprocess::prepare_input(image);
-    let tensor = Tensor::from_shape(
-      &[
-        1,
-        3,
-        super::super::INPUT_SIZE as usize,
-        super::super::INPUT_SIZE as usize,
-      ],
-      &input,
-    )
-    .unwrap();
-    let model_path = model::source_model_path();
-    let model = model::load_model_from_path(model_path.clone(), super::super::INPUT_SIZE)
-      .unwrap_or_else(|err| panic!("failed to load {}: {err}", model_path.display()));
-    let outputs = model.run(tvec!(tensor.into())).unwrap();
-    let output = outputs[0].to_array_view::<f32>().unwrap();
+    let (_, input, letterbox, model_output) = run_model_for_debug(&image_path);
 
     println!("image_path={}", image_path.display());
-    println!("model_path={}", model_path.display());
-    println!(
-      "letterbox={{ original_width: {}, original_height: {}, scale: {}, pad_x: {}, pad_y: {} }}",
-      letterbox.original_width, letterbox.original_height, letterbox.scale, letterbox.pad_x, letterbox.pad_y
-    );
+    println!("letterbox={letterbox:?}");
     println!("input_len={}", input.len());
-    println!("model_output_shape={:?}", output.shape());
-    println!("model_output_stats={:?}", stats(output.iter().copied()));
+    println!("model_output_shape={:?}", model_output.shape());
+    println!("model_output_stats={:?}", stats(model_output.iter().copied()));
     println!(
       "model_output_first_values={:?}",
-      output.iter().take(24).copied().collect::<Vec<_>>()
+      model_output.iter().take(24).copied().collect::<Vec<_>>()
     );
+    print_detection_rows(&model_output.view());
   }
 
   #[test]
@@ -88,50 +63,159 @@ mod debug_tests {
       return;
     };
 
+    let (_, _, letterbox, model_output) = run_model_for_debug(&image_path);
+    print_detection_rows(&model_output.view());
+
+    let (detections, diagnostics) =
+      yolo::parse_output(&model_output.view(), &letterbox, super::super::CONFIDENCE_THRESHOLD);
+    println!("detection_count={}", detections.len());
+    println!(
+      "detections_sample={:#?}",
+      detections.iter().take(16).collect::<Vec<_>>()
+    );
+    println!("diagnostics_after_parse={diagnostics:#?}");
+
+    let hand_tiles = hand::infer_hand_tiles(&detections);
+    println!("hand_tiles={hand_tiles:#?}");
+
+    let result = output::recognition_result(detections, hand_tiles, diagnostics);
+    println!(
+      "recognition_result_json={}",
+      serde_json::to_string_pretty(&result).unwrap()
+    );
+  }
+
+  #[test]
+  #[ignore = "set SPARROW_VISION_DEBUG_IMAGE to an image path and run with --ignored --nocapture"]
+  fn debug_save_annotated_recognition_image() {
+    let Some(image_path) = debug_image_path() else {
+      print_missing_image_help();
+      return;
+    };
+
+    let (image_bytes, _, letterbox, model_output) = run_model_for_debug(&image_path);
+    let (detections, diagnostics) =
+      yolo::parse_output(&model_output.view(), &letterbox, super::super::CONFIDENCE_THRESHOLD);
+    let hand_tiles = hand::infer_hand_tiles(&detections);
+    let result = output::recognition_result(detections, hand_tiles, diagnostics);
+
+    let mut annotated = image::load_from_memory(&image_bytes)
+      .unwrap_or_else(|err| panic!("failed to decode {}: {err}", image_path.display()))
+      .to_rgb8();
+    for detection in &result.detections {
+      draw_bbox(&mut annotated, &detection.bbox, color_for_detection(detection));
+    }
+
+    let output_path = annotated_output_path(&image_path);
+    annotated
+      .save(&output_path)
+      .unwrap_or_else(|err| panic!("failed to save {}: {err}", output_path.display()));
+
+    println!("image_path={}", image_path.display());
+    println!("annotated_output_path={}", output_path.display());
+    println!("detection_count={}", result.detections.len());
+    println!("hand_tiles={:#?}", result.hand_tiles);
+  }
+
+  fn run_model_for_debug(image_path: &Path) -> (Vec<u8>, Vec<f32>, preprocess::Letterbox, ArrayD<f32>) {
     let image_bytes =
-      fs::read(&image_path).unwrap_or_else(|err| panic!("failed to read {}: {err}", image_path.display()));
+      fs::read(image_path).unwrap_or_else(|err| panic!("failed to read {}: {err}", image_path.display()));
     let image = image::load_from_memory(&image_bytes)
       .unwrap_or_else(|err| panic!("failed to decode {}: {err}", image_path.display()));
     let (input, letterbox) = preprocess::prepare_input(image);
-    let tensor = Tensor::from_shape(
+    let tensor = input_tensor(&input);
+    let model_path = model::source_model_path();
+    let model = model::load_model_from_path(model_path.clone(), super::super::INPUT_SIZE)
+      .unwrap_or_else(|err| panic!("failed to load {}: {err}", model_path.display()));
+    let outputs = model.run(tvec!(tensor.into())).unwrap();
+    let model_output = outputs[0].to_array_view::<f32>().unwrap().to_owned().into_dyn();
+
+    (image_bytes, input, letterbox, model_output)
+  }
+
+  fn input_tensor(input: &[f32]) -> Tensor {
+    Tensor::from_shape(
       &[
         1,
         3,
         super::super::INPUT_SIZE as usize,
         super::super::INPUT_SIZE as usize,
       ],
-      &input,
+      input,
     )
-    .unwrap();
-    let model_path = model::source_model_path();
-    let model = model::load_model_from_path(model_path.clone(), super::super::INPUT_SIZE)
-      .unwrap_or_else(|err| panic!("failed to load {}: {err}", model_path.display()));
-    let outputs = model.run(tvec!(tensor.into())).unwrap();
-    let model_output = outputs[0].to_array_view::<f32>().unwrap();
+    .unwrap()
+  }
 
-    let (raw, mut diagnostics) = yolo::parse_output(&model_output, &letterbox, super::super::CONFIDENCE_THRESHOLD);
-    println!("raw_detection_count={}", raw.len());
-    println!("raw_detections_sample={:#?}", raw.iter().take(16).collect::<Vec<_>>());
-    println!("diagnostics_after_yolo={:#?}", diagnostics);
+  fn draw_bbox(image: &mut RgbImage, bbox: &BBox, color: Rgb<u8>) {
+    let max_x = image.width().saturating_sub(1) as i32;
+    let max_y = image.height().saturating_sub(1) as i32;
+    let x1 = bbox.x.round().clamp(0.0, max_x as f32) as i32;
+    let y1 = bbox.y.round().clamp(0.0, max_y as f32) as i32;
+    let x2 = (bbox.x + bbox.width).round().clamp(0.0, max_x as f32) as i32;
+    let y2 = (bbox.y + bbox.height).round().clamp(0.0, max_y as f32) as i32;
 
-    let nms = nms::suppress_overlaps(
-      raw,
-      super::super::NMS_IOU_THRESHOLD,
-      super::super::MAX_DETECTIONS,
-      &mut diagnostics,
-    );
-    println!("detections_after_nms={:#?}", nms.detections);
-    println!("diagnostics_after_nms={:#?}", diagnostics);
-    println!("trimmed_to_max={}", nms.trimmed_to_max);
+    for inset in 0..3 {
+      draw_rect_outline(image, x1 + inset, y1 + inset, x2 - inset, y2 - inset, color);
+    }
+  }
 
-    let hand_tiles = hand::infer_hand_tiles(&nms.detections);
-    println!("hand_tiles={:#?}", hand_tiles);
+  fn draw_rect_outline(image: &mut RgbImage, x1: i32, y1: i32, x2: i32, y2: i32, color: Rgb<u8>) {
+    if x1 > x2 || y1 > y2 {
+      return;
+    }
 
-    let result = output::recognition_result(nms.detections, hand_tiles, diagnostics, nms.trimmed_to_max);
-    println!(
-      "recognition_result_json={}",
-      serde_json::to_string_pretty(&result).unwrap()
-    );
+    for x in x1..=x2 {
+      put_pixel_checked(image, x, y1, color);
+      put_pixel_checked(image, x, y2, color);
+    }
+    for y in y1..=y2 {
+      put_pixel_checked(image, x1, y, color);
+      put_pixel_checked(image, x2, y, color);
+    }
+  }
+
+  fn put_pixel_checked(image: &mut RgbImage, x: i32, y: i32, color: Rgb<u8>) {
+    if x >= 0 && y >= 0 && x < image.width() as i32 && y < image.height() as i32 {
+      image.put_pixel(x as u32, y as u32, color);
+    }
+  }
+
+  fn color_for_detection(detection: &Detection) -> Rgb<u8> {
+    if detection.confidence >= 0.75 {
+      Rgb([0, 255, 80])
+    } else if detection.confidence >= 0.5 {
+      Rgb([255, 220, 0])
+    } else {
+      Rgb([255, 64, 64])
+    }
+  }
+
+  fn annotated_output_path(image_path: &Path) -> PathBuf {
+    let stem = image_path
+      .file_stem()
+      .and_then(|stem| stem.to_str())
+      .unwrap_or("recognition");
+    env::temp_dir().join(format!("{stem}.annotated.jpg"))
+  }
+
+  fn print_detection_rows(output: &ArrayViewD<f32>) {
+    if output.shape().len() != 3 || output.shape()[2] != 6 {
+      return;
+    }
+
+    let row_count = output.shape()[1].min(16);
+    println!("model_output_detection_rows_sample=[x1, y1, x2, y2, conf, cls]");
+    for index in 0..row_count {
+      println!(
+        "  row[{index}] = [{}, {}, {}, {}, {}, {}]",
+        output[[0, index, 0]],
+        output[[0, index, 1]],
+        output[[0, index, 2]],
+        output[[0, index, 3]],
+        output[[0, index, 4]],
+        output[[0, index, 5]]
+      );
+    }
   }
 
   fn debug_image_path() -> Option<PathBuf> {
@@ -164,7 +248,7 @@ mod debug_tests {
             "  $env:SPARROW_VISION_DEBUG_IMAGE='D:\\\\WorkSpace\\\\Bot\\\\mahjong\\\\sparrow-vision\\\\src-tauri\\\\tests\\\\fixtures\\\\recognition\\\\images\\\\sample.jpg'"
         );
     println!("Then run:");
-    println!("  cargo test -p sparrow-vision debug_output_to_recognition_result_for_image -- --ignored --nocapture");
+    println!("  cargo test -p sparrow-vision debug_save_annotated_recognition_image -- --ignored --nocapture");
   }
 
   fn stats(values: impl Iterator<Item = f32>) -> (usize, f32, f32, f32) {

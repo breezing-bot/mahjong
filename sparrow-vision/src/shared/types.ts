@@ -67,7 +67,6 @@ export interface RecognitionResult {
     kept_detection_count: number;
     dropped_low_confidence_count: number;
     dropped_unknown_class_count: number;
-    dropped_duplicate_count: number;
   };
 }
 
