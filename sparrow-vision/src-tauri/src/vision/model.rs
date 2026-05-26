@@ -22,7 +22,10 @@ pub fn cached_model(app: &AppHandle, input_size: u32) -> Result<VisionModel, Str
 }
 
 fn load_onnx_model(app: &AppHandle, input_size: u32) -> Result<VisionModel, String> {
-  let model_path = model_path(app);
+  load_model_from_path(model_path(app), input_size)
+}
+
+pub(crate) fn load_model_from_path(model_path: PathBuf, input_size: u32) -> Result<VisionModel, String> {
   let model = tract_onnx::onnx()
     .model_for_path(model_path)
     .map_err(|err| format!("加载 ONNX 模型失败：{err}"))?
@@ -37,7 +40,6 @@ fn load_onnx_model(app: &AppHandle, input_size: u32) -> Result<VisionModel, Stri
 
 fn model_path(app: &AppHandle) -> PathBuf {
   let resource_path = app.path().resolve("model/last.onnx", BaseDirectory::Resource);
-  println!("尝试加载模型路径：{:?}", resource_path);
   if let Ok(path) = resource_path {
     if path.exists() {
       return path;
@@ -47,7 +49,7 @@ fn model_path(app: &AppHandle) -> PathBuf {
   source_model_path()
 }
 
-fn source_model_path() -> PathBuf {
+pub(crate) fn source_model_path() -> PathBuf {
   PathBuf::from(env!("CARGO_MANIFEST_DIR"))
     .join("..")
     .join("..")
