@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "recognition_result.v1.json",
+  "title": "Mahjong Recognition Result v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "detections",
+    "hand_tiles",
+    "quality_flags",
+    "diagnostics"
+  ],
+  "properties": {
+    "detections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tile_id",
+          "confidence",
+          "bbox"
+        ],
+        "properties": {
+          "tile_id": {
+            "$ref": "tile_vocab.v1.json"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "bbox": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "x",
+              "y",
+              "width",
+              "height"
+            ],
+            "properties": {
+              "x": { "type": "number" },
+              "y": { "type": "number" },
+              "width": { "type": "number" },
+              "height": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "hand_tiles": {
+      "type": "array",
+      "items": {
+        "$ref": "tile_vocab.v1.json"
+      }
+    },
+    "quality_flags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "low_confidence_filtered",
+          "unknown_class_index",
+          "duplicate_tile_suppressed",
+          "trimmed_to_max_detections",
+          "empty_model_output",
+          "model_unavailable"
+        ]
+      }
+    },
+    "diagnostics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "raw_detection_count",
+        "kept_detection_count",
+        "dropped_low_confidence_count",
+        "dropped_unknown_class_count",
+        "dropped_duplicate_count"
+      ],
+      "properties": {
+        "raw_detection_count": { "type": "integer", "minimum": 0 },
+        "kept_detection_count": { "type": "integer", "minimum": 0 },
+        "dropped_low_confidence_count": { "type": "integer", "minimum": 0 },
+        "dropped_unknown_class_count": { "type": "integer", "minimum": 0 },
+        "dropped_duplicate_count": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

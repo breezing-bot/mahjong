@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "mahjong.scoring-result.v1",
+  "title": "AnalyzeHandResult",
+  "type": "object",
+  "required": ["is_win", "yaku", "han", "fu", "waits", "errors"],
+  "properties": {
+    "is_win": { "type": "boolean" },
+    "yaku": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "han"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "han": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "han": { "type": "integer", "minimum": 0 },
+    "fu": { "type": "integer", "minimum": 0 },
+    "score_breakdown": {
+      "type": ["object", "null"],
+      "required": ["base_points", "ron_points", "tsumo_points"],
+      "properties": {
+        "base_points": { "type": "integer" },
+        "ron_points": { "type": "integer" },
+        "tsumo_points": {
+          "type": ["object", "null"],
+          "required": ["dealer", "non_dealer"],
+          "properties": {
+            "dealer": { "type": "integer" },
+            "non_dealer": { "type": "integer" }
+          }
+        }
+      }
+    },
+    "waits": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "errors": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}
+
