@@ -3,6 +3,7 @@ import type { Detection, RecognitionResult } from "../../shared/types";
 import { tileLabel } from "../../shared/tiles";
 
 interface RecognitionPreviewProps {
+  busy: boolean;
   imageUrl: string | null;
   recognition: RecognitionResult | null;
   selectedTileId: number | null;
@@ -10,6 +11,7 @@ interface RecognitionPreviewProps {
 }
 
 export function RecognitionPreview({
+  busy,
   imageUrl,
   recognition,
   selectedTileId,
@@ -54,13 +56,13 @@ export function RecognitionPreview({
   return (
     <section className="panel preview-panel">
       <div className="panel-heading">
-        <h2>Recognition</h2>
-        <span className="meta">{detections.length} detections</span>
+        <h2>识别标注</h2>
+        <span className="meta">{detections.length} 张识别牌</span>
       </div>
       <div className="image-stage">
         {imageUrl ? (
           <img
-            alt="Recognition preview"
+            alt="识别标注预览"
             onLoad={updateImageSize}
             ref={imageRef}
             src={imageUrl}
@@ -68,9 +70,10 @@ export function RecognitionPreview({
         ) : (
           <div />
         )}
-        {detections.map((tile) => (
+        {detections.map((tile, index) => (
           <DetectionBox
             detection={tile}
+            index={index}
             key={tile.id}
             role={recognition ? tileRole(recognition, tile.id) : "unassigned"}
             scaleX={scaleX}
@@ -79,6 +82,7 @@ export function RecognitionPreview({
             onSelect={() => onTileSelect(tile.id)}
           />
         ))}
+        {busy ? <div className="recognition-overlay">正在识别图片...</div> : null}
       </div>
     </section>
   );
@@ -86,6 +90,7 @@ export function RecognitionPreview({
 
 function DetectionBox({
   detection,
+  index,
   role,
   selected,
   scaleX,
@@ -93,12 +98,15 @@ function DetectionBox({
   onSelect,
 }: {
   detection: Detection;
+  index: number;
   role: TileRole;
   selected: boolean;
   scaleX: number;
   scaleY: number;
   onSelect: () => void;
 }) {
+  const labelOffset = LABEL_OFFSETS[index % LABEL_OFFSETS.length];
+
   return (
     <button
       className={`detection-box detection-${role}${selected ? " detection-selected" : ""}`}
@@ -112,10 +120,25 @@ function DetectionBox({
       type="button"
       onClick={onSelect}
     >
-      <span>{tileLabel(detection.tile_id)}</span>
+      <span
+        style={{
+          transform: `translate(${labelOffset.x}px, ${labelOffset.y}px)`,
+        }}
+      >
+        {tileLabel(detection.tile_id)}
+      </span>
     </button>
   );
 }
+
+const LABEL_OFFSETS = [
+  { x: 0, y: 0 },
+  { x: 10, y: -10 },
+  { x: -10, y: 10 },
+  { x: 18, y: 8 },
+  { x: -18, y: -8 },
+  { x: 28, y: -18 },
+];
 
 type TileRole = "closed" | "winning" | "meld" | "unassigned";
 

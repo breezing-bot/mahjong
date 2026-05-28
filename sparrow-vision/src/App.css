@@ -162,6 +162,10 @@ input {
   color: #657080;
 }
 
+.upload-drop-zone {
+  min-height: 74px;
+}
+
 .drop-zone img,
 .image-stage img {
   display: block;
@@ -175,6 +179,18 @@ input {
   overflow: auto;
   border-radius: 8px;
   background: #111827;
+}
+
+.recognition-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(17, 24, 39, 0.62);
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0;
+  pointer-events: none;
 }
 
 .image-stage > div:first-child {
@@ -200,6 +216,7 @@ input {
   color: #fff;
   font-size: 12px;
   white-space: nowrap;
+  pointer-events: none;
 }
 
 .detection-closed {
@@ -356,6 +373,23 @@ input {
   background: #fff9e8;
 }
 
+.settings-section {
+  border-top: 1px solid #edf0f4;
+  padding-top: 12px;
+}
+
+.settings-section:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.settings-section h3 {
+  margin: 0 0 10px;
+  color: #394554;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
 .settings-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -373,7 +407,7 @@ input {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  margin: 12px 0;
+  margin: 0;
 }
 
 .toggle {

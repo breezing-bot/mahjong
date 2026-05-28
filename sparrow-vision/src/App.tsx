@@ -44,16 +44,24 @@ function App() {
   const [busy, setBusy] = useState<"idle" | "recognizing" | "scoring">("idle");
 
   const status = useMemo(() => {
-    if (busy === "recognizing") return "Recognizing photo";
-    if (busy === "scoring") return "Calculating score";
-    if (result?.errors.length) return "Input needs review";
-    if (result?.is_win) return "Score complete";
-    return "Waiting for photo or manual input";
+    if (busy === "recognizing") return "正在识别照片";
+    if (busy === "scoring") return "正在计算点数";
+    if (result?.errors.length) return "需要修正输入";
+    if (result?.is_win) return "计算完成";
+    return "等待照片或手动录入";
   }, [busy, result]);
 
   async function handleFile(file: File) {
     setBusy("recognizing");
     setResult(null);
+    setRecognition(null);
+    setSelectedTileId(null);
+    setRequest((current) => ({
+      ...current,
+      hand: [],
+      hora: DEFAULT_REQUEST.hora,
+      naki: [],
+    }));
     const nextUrl = URL.createObjectURL(file);
     setImageUrl((current) => {
       if (current) URL.revokeObjectURL(current);
@@ -139,18 +147,18 @@ function App() {
           <p>{status}</p>
         </div>
         <div className="topbar-stats">
-          <span>{request.hand.length} closed</span>
-          <span>{request.naki.length} melds</span>
+          <span>{request.hand.length} 张闭手牌</span>
+          <span>{request.naki.length} 组副露</span>
         </div>
       </header>
       <div className="workspace">
         <div className="left-column">
           <ImageUpload
             busy={busy === "recognizing"}
-            imageUrl={imageUrl}
             onFile={handleFile}
           />
           <RecognitionPreview
+            busy={busy === "recognizing"}
             imageUrl={imageUrl}
             recognition={recognition}
             selectedTileId={selectedTileId}
@@ -205,10 +213,10 @@ function requestFromRecognition(
 function recognitionValidationErrors(recognition: RecognitionResult): string[] {
   const errors: string[] = [];
   if (recognition.layout.hora === null) {
-    errors.push("Please choose a winning tile before scoring.");
+    errors.push("请先选择和了牌。");
   }
   if (recognition.layout.naki.some((meld) => meld.kind === "unknown")) {
-    errors.push("Please confirm every meld type before scoring.");
+    errors.push("请先确认所有副露类型。");
   }
   return errors;
 }

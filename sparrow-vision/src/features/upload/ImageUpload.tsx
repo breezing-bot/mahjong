@@ -1,10 +1,9 @@
 interface ImageUploadProps {
-  imageUrl: string | null;
   busy: boolean;
   onFile: (file: File) => void;
 }
 
-export function ImageUpload({ imageUrl, busy, onFile }: ImageUploadProps) {
+export function ImageUpload({ busy, onFile }: ImageUploadProps) {
   function pickFile(fileList: FileList | null) {
     const file = fileList?.[0];
     if (file) {
@@ -17,27 +16,26 @@ export function ImageUpload({ imageUrl, busy, onFile }: ImageUploadProps) {
       <div className="panel-heading">
         <h2>照片</h2>
         <label className="file-button">
-          选择图片
+          {busy ? "识别中" : "选择图片"}
           <input
             accept="image/*"
+            disabled={busy}
             type="file"
             onChange={(event) => pickFile(event.currentTarget.files)}
           />
         </label>
       </div>
       <div
-        className="drop-zone"
+        className="drop-zone upload-drop-zone"
         onDragOver={(event) => event.preventDefault()}
         onDrop={(event) => {
           event.preventDefault();
-          pickFile(event.dataTransfer.files);
+          if (!busy) {
+            pickFile(event.dataTransfer.files);
+          }
         }}
       >
-        {imageUrl ? (
-          <img alt="牌桌照片预览" src={imageUrl} />
-        ) : (
-          <span>{busy ? "识别中" : "拖入牌桌照片"}</span>
-        )}
+        <span>{busy ? "正在识别图片" : "拖入图片到这里"}</span>
       </div>
     </section>
   );

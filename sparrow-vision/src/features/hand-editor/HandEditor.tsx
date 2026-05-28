@@ -24,10 +24,10 @@ export function HandEditor({
     return (
       <section className="panel editor-panel">
         <div className="panel-heading">
-          <h2>Hand editor</h2>
-          <span className="meta">No tiles</span>
+          <h2>牌面编辑</h2>
+          <span className="meta">暂无牌</span>
         </div>
-        <div className="result-empty">Upload a photo to edit recognized tiles.</div>
+        <div className="result-empty">上传照片后可编辑识别出的牌。</div>
       </section>
     );
   }
@@ -47,33 +47,33 @@ export function HandEditor({
   return (
     <section className="panel editor-panel">
       <div className="panel-heading">
-        <h2>Hand editor</h2>
-        <span className="meta">{recognition.detections.length} recognized</span>
+        <h2>牌面编辑</h2>
+        <span className="meta">{recognition.detections.length} 张识别牌</span>
       </div>
 
       <div className="assignment-bar">
         <div>
-          <strong>{selectedTile ? tileLabel(selectedTile.tile_id) : "No tile selected"}</strong>
+          <strong>{selectedTile ? tileLabel(selectedTile.tile_id) : "未选择牌"}</strong>
           {selectedTile ? <span className="muted-text"> {selectedTile.id}</span> : null}
         </div>
         <div className="assignment-actions">
           <button type="button" disabled={selectedTileId === null} onClick={() => assignSelected({ kind: "closed" })}>
-            Closed
+            闭手牌
           </button>
           <button type="button" disabled={selectedTileId === null} onClick={() => assignSelected({ kind: "winning" })}>
-            Winning
+            和了牌
           </button>
           <button type="button" disabled={selectedTileId === null} onClick={() => assignSelected({ kind: "unassigned" })}>
-            Unassigned
+            待确认
           </button>
           <button type="button" disabled={selectedTileId === null} onClick={() => assignSelected({ kind: "new-meld" })}>
-            New meld
+            新副露
           </button>
         </div>
       </div>
 
       <TileRack
-        title="Closed hand"
+        title="闭手牌"
         ids={recognition.layout.hand}
         recognition={recognition}
         selectedTileId={selectedTileId}
@@ -87,7 +87,7 @@ export function HandEditor({
 
       <div className="rack">
         <div className="rack-heading">
-          <h3>Winning tile</h3>
+          <h3>和了牌</h3>
           <button
             type="button"
             disabled={recognition.layout.hora === null}
@@ -96,7 +96,7 @@ export function HandEditor({
               if (tileId !== null) update(assignTile(recognition, tileId, { kind: "unassigned" }));
             }}
           >
-            Clear
+            清空
           </button>
         </div>
         <div className="tile-row">
@@ -110,7 +110,7 @@ export function HandEditor({
               onRemove={(tileId) => update(assignTile(recognition, tileId, { kind: "unassigned" }))}
             />
           ) : (
-            <span className="result-empty">Choose one tile as winning.</span>
+            <span className="result-empty">请选择一张和了牌。</span>
           )}
         </div>
       </div>
@@ -123,7 +123,7 @@ export function HandEditor({
       />
 
       <TileRack
-        title="Unassigned"
+        title="待确认"
         ids={recognition.layout.unassigned}
         recognition={recognition}
         selectedTileId={selectedTileId}
@@ -205,7 +205,7 @@ function EditableTile({
     <div className="tile-edit">
       <TileBadge selected={selected} tile={tile.tile_id} onClick={() => onSelect(id)} />
       <select
-        aria-label="Change tile"
+        aria-label="修改牌"
         value={tile.tile_id}
         onChange={(event) => onTileChange(id, event.currentTarget.value as TileId)}
       >
@@ -216,13 +216,13 @@ function EditableTile({
         ))}
       </select>
       <div className="mini-actions">
-        <button type="button" title="Move left" disabled={!onMove} onClick={() => onMove?.(-1)}>
+        <button type="button" title="左移" disabled={!onMove} onClick={() => onMove?.(-1)}>
           &lt;
         </button>
-        <button type="button" title="Move right" disabled={!onMove} onClick={() => onMove?.(1)}>
+        <button type="button" title="右移" disabled={!onMove} onClick={() => onMove?.(1)}>
           &gt;
         </button>
-        <button type="button" title="Remove" onClick={() => onRemove(id)}>
+        <button type="button" title="移除" onClick={() => onRemove(id)}>
           x
         </button>
       </div>
@@ -244,7 +244,7 @@ function MeldEditor({
   return (
     <div className="rack">
       <div className="rack-heading">
-        <h3>Melds</h3>
+        <h3>副露</h3>
         <button
           type="button"
           disabled={selectedTileId === null}
@@ -252,7 +252,7 @@ function MeldEditor({
             selectedTileId !== null && onChange(assignTile(recognition, selectedTileId, { kind: "new-meld" }))
           }
         >
-          New meld
+          新副露
         </button>
       </div>
       <div className="meld-list">
@@ -299,7 +299,7 @@ function MeldRow({
   return (
     <div className={`meld-row${meld.needs_confirmation ? " needs-confirmation" : ""}`}>
       <select
-        aria-label="Meld type"
+        aria-label="副露类型"
         value={meld.kind}
         onChange={(event) =>
           updateMeld({
@@ -309,11 +309,11 @@ function MeldRow({
           })
         }
       >
-        <option value="unknown">Unknown</option>
-        <option value="chi">Chi</option>
-        <option value="pon">Pon</option>
-        <option value="daiminkan">Open kan</option>
-        <option value="ankan">Closed kan</option>
+        <option value="unknown">待确认</option>
+        <option value="chi">吃</option>
+        <option value="pon">碰</option>
+        <option value="daiminkan">明杠</option>
+        <option value="ankan">暗杠</option>
       </select>
       {meld.tiles.map((id, index) => (
         <EditableTile
@@ -335,7 +335,7 @@ function MeldRow({
           onChange(assignTile(recognition, selectedTileId, { kind: "meld", meldId: meld.id }))
         }
       >
-        Add selected
+        加入选中牌
       </button>
       <button
         type="button"
@@ -350,7 +350,7 @@ function MeldRow({
           })
         }
       >
-        Delete
+        删除
       </button>
     </div>
   );

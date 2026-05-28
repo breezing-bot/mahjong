@@ -68,7 +68,7 @@ const HONOR_LABELS: Record<string, string> = {
 };
 
 export function tileLabel(tile: TileId): string {
-  if (tile[0] === "0") return `赤5${suitLabel(tile[1])}`;
+  if (tile[0] === "0") return `赤${suitLabel(tile[1])}`;
   if (tile.endsWith("z")) return HONOR_LABELS[tile] ?? tile;
   if (tile.endsWith("f")) return `花${tile[0]}`;
   return `${tile[0]}${suitLabel(tile[1])}`;

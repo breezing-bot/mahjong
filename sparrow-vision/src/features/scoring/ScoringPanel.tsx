@@ -27,108 +27,114 @@ export function ScoringPanel({
   return (
     <section className="panel scoring-panel">
       <div className="panel-heading">
-        <h2>算番</h2>
+        <h2>算点</h2>
         <button type="button" disabled={busy} onClick={onAnalyze}>
           {busy ? "计算中" : "计算"}
         </button>
       </div>
-      <div className="settings-grid">
-        <label>
-          场风
-          <select
-            value={request.bakaze}
-            onChange={(event) =>
-              onChange({ ...request, bakaze: event.currentTarget.value as WindInput })
-            }
-          >
-            {WIND_OPTIONS.map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          自风
-          <select
-            value={request.zikaze}
-            onChange={(event) =>
-              onChange({ ...request, zikaze: event.currentTarget.value as WindInput })
-            }
-          >
-            {WIND_OPTIONS.map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          和法
-          <select
-            value={request.win_method}
-            onChange={(event) =>
-              onChange({
-                ...request,
-                win_method: event.currentTarget.value as WinMethodInput,
-              })
-            }
-          >
-            <option value="ron">荣和</option>
-            <option value="tsumo">自摸</option>
-          </select>
-        </label>
-        <label>
-          立直
-          <select
-            value={request.riichi}
-            onChange={(event) =>
-              onChange({ ...request, riichi: event.currentTarget.value as RiichiInput })
-            }
-          >
-            <option value="none">无</option>
-            <option value="riichi">立直</option>
-            <option value="double_riichi">双立直</option>
-          </select>
-        </label>
-        <label>
-          本场
-          <input
-            min={0}
-            type="number"
-            value={request.honba}
-            onChange={(event) =>
-              onChange({ ...request, honba: Number(event.currentTarget.value) })
-            }
-          />
-        </label>
-      </div>
-      <div className="toggle-grid">
-        {[
-          ["ippatsu", "一发"],
-          ["chankan", "抢杠"],
-          ["rinshan", "岭上"],
-          ["haitei", "海底"],
-          ["hotei", "河底"],
-          ["first_turn_tsumo", "首巡自摸"],
-        ].map(([key, label]) => (
-          <label className="toggle" key={key}>
-            <input
-              checked={Boolean(request.special_win[key as keyof typeof request.special_win])}
-              type="checkbox"
+      <div className="settings-section">
+        <h3>基础设置</h3>
+        <div className="settings-grid">
+          <label>
+            场风
+            <select
+              value={request.bakaze}
+              onChange={(event) =>
+                onChange({ ...request, bakaze: event.currentTarget.value as WindInput })
+              }
+            >
+              {WIND_OPTIONS.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            自风
+            <select
+              value={request.zikaze}
+              onChange={(event) =>
+                onChange({ ...request, zikaze: event.currentTarget.value as WindInput })
+              }
+            >
+              {WIND_OPTIONS.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            和牌方式
+            <select
+              value={request.win_method}
               onChange={(event) =>
                 onChange({
                   ...request,
-                  special_win: {
-                    ...request.special_win,
-                    [key]: event.currentTarget.checked,
-                  },
+                  win_method: event.currentTarget.value as WinMethodInput,
                 })
               }
-            />
-            {label}
+            >
+              <option value="ron">荣和</option>
+              <option value="tsumo">自摸</option>
+            </select>
           </label>
-        ))}
+          <label>
+            立直
+            <select
+              value={request.riichi}
+              onChange={(event) =>
+                onChange({ ...request, riichi: event.currentTarget.value as RiichiInput })
+              }
+            >
+              <option value="none">无</option>
+              <option value="riichi">立直</option>
+              <option value="double_riichi">双立直</option>
+            </select>
+          </label>
+          <label>
+            本场
+            <input
+              min={0}
+              type="number"
+              value={request.honba}
+              onChange={(event) =>
+                onChange({ ...request, honba: Number(event.currentTarget.value) })
+              }
+            />
+          </label>
+        </div>
+      </div>
+      <div className="settings-section special-win-section">
+        <h3>特殊胡法</h3>
+        <div className="toggle-grid">
+          {[
+            ["ippatsu", "一发"],
+            ["chankan", "抢杠"],
+            ["rinshan", "岭上"],
+            ["haitei", "海底"],
+            ["hotei", "河底"],
+            ["first_turn_tsumo", "首巡自摸"],
+          ].map(([key, label]) => (
+            <label className="toggle" key={key}>
+              <input
+                checked={Boolean(request.special_win[key as keyof typeof request.special_win])}
+                type="checkbox"
+                onChange={(event) =>
+                  onChange({
+                    ...request,
+                    special_win: {
+                      ...request.special_win,
+                      [key]: event.currentTarget.checked,
+                    },
+                  })
+                }
+              />
+              {label}
+            </label>
+          ))}
+        </div>
       </div>
       <IndicatorEditor
         label="宝牌指示牌"
@@ -212,9 +218,7 @@ function ResultView({ result }: { result: ScoringResult | null }) {
         <strong>{result.han} 番</strong>
         <strong>{result.fu} 符</strong>
       </div>
-      {result.ron_points ? (
-        <p>荣和 {result.ron_points} 点</p>
-      ) : null}
+      {result.ron_points ? <p>荣和 {result.ron_points} 点</p> : null}
       {result.tsumo_points ? (
         <p>
           自摸 庄家 {result.tsumo_points.dealer} / 闲家{" "}
