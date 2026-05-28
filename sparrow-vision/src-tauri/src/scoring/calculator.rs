@@ -1,7 +1,5 @@
 use super::{adapter, melds, points, request, tiles, yaku};
-use crate::types::{AnalyzeHandRequest, ScoringResult, WindInput};
-use riichi_calc::calculator::score::calc_score;
-use riichi_calc::finder::finder::Finder;
+use crate::types::{AnalyzeHandRequest, ScoringResult};
 use riichi_calc::finder::result::FoundResult;
 
 pub fn analyze_hand(request: AnalyzeHandRequest) -> ScoringResult {
@@ -25,7 +23,7 @@ fn analyze_hand_inner(request: AnalyzeHandRequest) -> Result<ScoringResult, Stri
     .clone()
     .ok_or_else(|| "请先标记和了牌".to_string())?;
   let winning_tile = tiles::parse_tile_id(&winning_tile_id)?;
-  let hand_tiles = request::normalize_closed_hand(&request.hand_tiles, &winning_tile_id, request.melds.len())?;
+  let hand_tiles = request::normalize_closed_hand(&request.hand_tiles, request.melds.len())?;
   let hand = hand_tiles
     .iter()
     .map(|tile| tiles::parse_tile_id(tile))
@@ -48,54 +46,25 @@ fn analyze_hand_inner(request: AnalyzeHandRequest) -> Result<ScoringResult, Stri
 
   let field = adapter::field(&request, dora);
   let status = adapter::status(&request, ura_dora);
-  let input = adapter::input(hand, naki, winning_tile, field.clone(), status.clone());
-
-  let parsed = input
-    .parse_hand()
+  let output = adapter::input(hand, naki, winning_tile, field, status)
+    .calc_hand()
     .map_err(|err| format!("输入不是合法和牌形：{err:?}"))?;
 
-  let mut best: Option<ScoringResult> = None;
-  for hand in parsed {
-    let found = Finder::find_hand(&hand);
-    if !found.is_valid_hora() {
-      continue;
-    }
-
-    let score = calc_score(&found, &field, &hand.winning_hand, &status);
-    let actual_points = points::actual_points(
-      score.detail.fu,
-      score.detail.han,
-      &found,
-      &status.win_method,
-      request.self_wind == WindInput::East,
-      request.honba,
-    );
-    let is_yakuman = matches!(found, FoundResult::FoundYakuman(_));
-    let candidate = ScoringResult {
-      is_win: true,
-      yaku: yaku::flatten_yaku(&found),
-      han: score.detail.han,
-      fu: score.detail.fu,
-      score_breakdown: Some(points::score_breakdown(
-        &actual_points,
-        score.detail.fu,
-        score.detail.han,
-        is_yakuman,
-      )),
-      waits: Vec::new(),
-      errors: Vec::new(),
-    };
-
-    if best
-      .as_ref()
-      .map(|current| points::result_rank(current) < points::result_rank(&candidate))
-      .unwrap_or(true)
-    {
-      best = Some(candidate);
-    }
-  }
-
-  best.ok_or_else(|| "没有找到役种，无法和牌".to_string())
+  let is_yakuman = matches!(output.found_result, FoundResult::FoundYakuman(_));
+  Ok(ScoringResult {
+    is_win: true,
+    yaku: yaku::flatten_yaku(&output.found_result),
+    han: output.score_result.detail.han,
+    fu: output.score_result.detail.fu,
+    score_breakdown: Some(points::score_breakdown(
+      &output.score_result.actual_points,
+      output.score_result.detail.fu,
+      output.score_result.detail.han,
+      is_yakuman,
+    )),
+    waits: Vec::new(),
+    errors: Vec::new(),
+  })
 }
 
 #[cfg(test)]
@@ -106,12 +75,12 @@ mod tests {
   fn base_request() -> AnalyzeHandRequest {
     AnalyzeHandRequest {
       hand_tiles: vec![
-        "m1", "m2", "m3", "m5", "m6", "m7", "p2", "p3", "p4", "s6", "s7", "s9", "s9",
+        "1m", "2m", "3m", "5m", "6m", "7m", "2p", "3p", "4p", "6s", "7s", "9s", "9s",
       ]
       .into_iter()
       .map(String::from)
       .collect(),
-      winning_tile: Some("s5".to_string()),
+      winning_tile: Some("5s".to_string()),
       melds: Vec::new(),
       self_wind: WindInput::East,
       round_wind: WindInput::East,
@@ -158,14 +127,14 @@ mod tests {
   #[test]
   fn accepts_open_meld_shape() {
     let request = AnalyzeHandRequest {
-      hand_tiles: vec!["m4", "m5", "m6", "p2", "p3", "p4", "s6", "s7", "s9", "s9"]
+      hand_tiles: vec!["4m", "5m", "6m", "2p", "3p", "4p", "6s", "7s", "9s", "9s"]
         .into_iter()
         .map(String::from)
         .collect(),
-      winning_tile: Some("s5".to_string()),
+      winning_tile: Some("5s".to_string()),
       melds: vec![MeldInput {
         kind: MeldKind::Pon,
-        tiles: vec!["z5", "z5", "z5"].into_iter().map(String::from).collect(),
+        tiles: vec!["5z", "5z", "5z"].into_iter().map(String::from).collect(),
       }],
       self_wind: WindInput::East,
       round_wind: WindInput::East,

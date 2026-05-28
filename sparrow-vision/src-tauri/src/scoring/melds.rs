@@ -65,28 +65,28 @@ mod tests {
   #[test]
   fn converts_valid_melds() {
     assert!(matches!(
-      convert_meld(&meld(MeldKind::Chi, &["m1", "m2", "m3"])).unwrap(),
+      convert_meld(&meld(MeldKind::Chi, &["1m", "2m", "3m"])).unwrap(),
       Mentsu::Shuntsu(_, true)
     ));
     assert!(matches!(
-      convert_meld(&meld(MeldKind::Pon, &["z5", "z5", "z5"])).unwrap(),
+      convert_meld(&meld(MeldKind::Pon, &["5z", "5z", "5z"])).unwrap(),
       Mentsu::Koutsu(_, true)
     ));
     assert!(matches!(
-      convert_meld(&meld(MeldKind::Daiminkan, &["p1", "p1", "p1", "p1"])).unwrap(),
+      convert_meld(&meld(MeldKind::Daiminkan, &["1p", "1p", "1p", "1p"])).unwrap(),
       Mentsu::Kantsu(_, true)
     ));
     assert!(matches!(
-      convert_meld(&meld(MeldKind::Ankan, &["s9", "s9", "s9", "s9"])).unwrap(),
+      convert_meld(&meld(MeldKind::Ankan, &["9s", "9s", "9s", "9s"])).unwrap(),
       Mentsu::Kantsu(_, false)
     ));
   }
 
   #[test]
   fn rejects_invalid_melds() {
-    assert!(convert_meld(&meld(MeldKind::Chi, &["z1", "z2", "z3"])).is_err());
-    assert!(convert_meld(&meld(MeldKind::Chi, &["m1", "m2"])).is_err());
-    assert!(convert_meld(&meld(MeldKind::Pon, &["m1", "m1", "m2"])).is_err());
-    assert!(convert_meld(&meld(MeldKind::Daiminkan, &["m1", "m1", "m1"])).is_err());
+    assert!(convert_meld(&meld(MeldKind::Chi, &["1z", "2z", "3z"])).is_err());
+    assert!(convert_meld(&meld(MeldKind::Chi, &["1m", "2m"])).is_err());
+    assert!(convert_meld(&meld(MeldKind::Pon, &["1m", "1m", "2m"])).is_err());
+    assert!(convert_meld(&meld(MeldKind::Daiminkan, &["1m", "1m", "1m"])).is_err());
   }
 }

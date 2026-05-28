@@ -41,11 +41,11 @@ mod tests {
   #[test]
   fn bottom_row_becomes_hand_tiles_sorted_by_x() {
     let detections = vec![
-      detection("m2", 60.0, 400.0),
-      detection("p1", 20.0, 100.0),
-      detection("m1", 20.0, 400.0),
+      detection("2m", 60.0, 400.0),
+      detection("1p", 20.0, 100.0),
+      detection("1m", 20.0, 400.0),
     ];
 
-    assert_eq!(infer_hand_tiles(&detections), vec!["m1", "m2"]);
+    assert_eq!(infer_hand_tiles(&detections), vec!["1m", "2m"]);
   }
 }

@@ -7,7 +7,7 @@ import type {
   WinMethodInput,
 } from "../../shared/types";
 import { TileBadge } from "../../shared/TileBadge";
-import { TILE_IDS, tileLabel, WIND_OPTIONS } from "../../shared/tiles";
+import { SCORING_TILE_IDS, tileLabel, WIND_OPTIONS } from "../../shared/tiles";
 
 interface ScoringPanelProps {
   request: AnalyzeHandRequest;
@@ -172,7 +172,7 @@ function IndicatorEditor({
           <option value="" disabled>
             添加
           </option>
-          {TILE_IDS.map((tile) => (
+          {SCORING_TILE_IDS.map((tile) => (
             <option key={tile} value={tile}>
               {tileLabel(tile)}
             </option>

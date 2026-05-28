@@ -154,7 +154,7 @@ mod tests {
     assert_eq!(diagnostics.raw_detection_count, 300);
     assert_eq!(diagnostics.dropped_low_confidence_count, 299);
     assert_eq!(detections.len(), 1);
-    assert_eq!(detections[0].tile_id, "m3");
+    assert_eq!(detections[0].tile_id, "3m");
     assert_eq!(detections[0].confidence, 0.9);
     assert_eq!(detections[0].bbox.x, 144.0);
     assert_eq!(detections[0].bbox.y, 140.0);

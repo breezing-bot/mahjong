@@ -3244,7 +3244,7 @@ dependencies = [
 [[package]]
 name = "riichi-calc"
 version = "0.1.0"
-source = "git+https://github.com/breezing-contrib/riichi-calc.git#d185aa0eee078a43336f37c9530dfba2195a175a"
+source = "git+https://github.com/breezing-contrib/riichi-calc.git#1b2cd81355e525b46343d9f8198d2c51840f6f1b"
 dependencies = [
  "rand",
 ]

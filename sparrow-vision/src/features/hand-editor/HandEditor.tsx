@@ -1,6 +1,6 @@
 import type { MeldInput, MeldKind, TileId } from "../../shared/types";
 import { TileBadge } from "../../shared/TileBadge";
-import { TILE_IDS, tileLabel } from "../../shared/tiles";
+import { SCORING_TILE_IDS, tileLabel } from "../../shared/tiles";
 
 interface HandEditorProps {
   handTiles: TileId[];
@@ -89,7 +89,7 @@ function TileRack({
                 onTilesChange(next);
               }}
             >
-              {TILE_IDS.map((option) => (
+              {SCORING_TILE_IDS.map((option) => (
                 <option key={option} value={option}>
                   {tileLabel(option)}
                 </option>
@@ -139,7 +139,7 @@ function MeldEditor({
         <button
           type="button"
           onClick={() =>
-            onChange([...melds, { kind: "pon", tiles: ["z5", "z5", "z5"] }])
+            onChange([...melds, { kind: "pon", tiles: ["5z", "5z", "5z"] }])
           }
         >
           添加副露
@@ -178,7 +178,7 @@ function MeldEditor({
                   onChange(next);
                 }}
               >
-                {TILE_IDS.map((option) => (
+                {SCORING_TILE_IDS.map((option) => (
                   <option key={option} value={option}>
                     {tileLabel(option)}
                   </option>
@@ -228,7 +228,7 @@ function TileSelect({
       <option value="" disabled>
         {label}
       </option>
-      {TILE_IDS.map((tile) => (
+      {SCORING_TILE_IDS.map((tile) => (
         <option key={tile} value={tile}>
           {tileLabel(tile)}
         </option>

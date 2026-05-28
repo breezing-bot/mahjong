@@ -1,52 +1,54 @@
 import type { TileId } from "./types";
 
 export const TILE_IDS = [
-  "m5r",
-  "m1",
-  "m2",
-  "m3",
-  "m4",
-  "m5",
-  "m6",
-  "m7",
-  "m8",
-  "m9",
-  "p5r",
-  "p1",
-  "p2",
-  "p3",
-  "p4",
-  "p5",
-  "p6",
-  "p7",
-  "p8",
-  "p9",
-  "s5r",
-  "s1",
-  "s2",
-  "s3",
-  "s4",
-  "s5",
-  "s6",
-  "s7",
-  "s8",
-  "s9",
-  "z1",
-  "z2",
-  "z3",
-  "z4",
-  "z5",
-  "z6",
-  "z7",
-  "f1",
-  "f2",
-  "f3",
-  "f4",
-  "f5",
-  "f6",
-  "f7",
-  "f8",
+  "0m",
+  "1m",
+  "2m",
+  "3m",
+  "4m",
+  "5m",
+  "6m",
+  "7m",
+  "8m",
+  "9m",
+  "0p",
+  "1p",
+  "2p",
+  "3p",
+  "4p",
+  "5p",
+  "6p",
+  "7p",
+  "8p",
+  "9p",
+  "0s",
+  "1s",
+  "2s",
+  "3s",
+  "4s",
+  "5s",
+  "6s",
+  "7s",
+  "8s",
+  "9s",
+  "1z",
+  "2z",
+  "3z",
+  "4z",
+  "5z",
+  "6z",
+  "7z",
+  "1f",
+  "2f",
+  "3f",
+  "4f",
+  "5f",
+  "6f",
+  "7f",
+  "8f",
 ] as const satisfies readonly TileId[];
+
+export const SCORING_TILE_IDS = TILE_IDS.filter((tile) => !tile.endsWith("f"));
 
 export const WIND_OPTIONS = [
   ["east", "东"],
@@ -55,34 +57,28 @@ export const WIND_OPTIONS = [
   ["north", "北"],
 ] as const;
 
+const HONOR_LABELS: Record<string, string> = {
+  "1z": "东",
+  "2z": "南",
+  "3z": "西",
+  "4z": "北",
+  "5z": "白",
+  "6z": "发",
+  "7z": "中",
+};
+
 export function tileLabel(tile: TileId): string {
-  if (tile.endsWith("r")) {
-    return `${tile[1]}赤${suitLabel(tile[0])}`;
-  }
-  if (tile.startsWith("z")) {
-    return (
-      {
-        z1: "东",
-        z2: "南",
-        z3: "西",
-        z4: "北",
-        z5: "白",
-        z6: "发",
-        z7: "中",
-      } as Record<string, string>
-    )[tile];
-  }
-  if (tile.startsWith("f")) {
-    return `花${tile.slice(1)}`;
-  }
-  return `${tile[1]}${suitLabel(tile[0])}`;
+  if (tile[0] === "0") return `赤5${suitLabel(tile[1])}`;
+  if (tile.endsWith("z")) return HONOR_LABELS[tile] ?? tile;
+  if (tile.endsWith("f")) return `花${tile[0]}`;
+  return `${tile[0]}${suitLabel(tile[1])}`;
 }
 
 export function tileTone(tile: TileId): string {
-  if (tile.startsWith("m")) return "manzu";
-  if (tile.startsWith("p")) return "pinzu";
-  if (tile.startsWith("s")) return "souzu";
-  if (tile.startsWith("z")) return "honor";
+  if (tile.endsWith("m")) return "manzu";
+  if (tile.endsWith("p")) return "pinzu";
+  if (tile.endsWith("s")) return "souzu";
+  if (tile.endsWith("z")) return "honor";
   return "flower";
 }
 

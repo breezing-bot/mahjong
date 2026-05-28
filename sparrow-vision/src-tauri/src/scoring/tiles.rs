@@ -1,47 +1,25 @@
 use riichi_calc::constants::tiles::{Tile, TileType};
+use std::str::FromStr;
 
 pub fn parse_tile_id(tile_id: &str) -> Result<Tile, String> {
-  if tile_id.starts_with('f') {
+  if tile_id.ends_with('f') {
     return Err(format!("{tile_id} 是花牌，v1 日麻计分不接受花牌"));
   }
 
-  let bytes = tile_id.as_bytes();
-  if bytes.len() < 2 {
-    return Err(format!("未知牌 ID：{tile_id}"));
-  }
-
-  let tile_type = match bytes[0] as char {
-    'm' => TileType::Manzu,
-    'p' => TileType::Pinzu,
-    's' => TileType::Souzu,
-    'z' => return parse_honor(tile_id),
-    _ => return Err(format!("未知牌 ID：{tile_id}")),
-  };
-
-  let number = if tile_id.ends_with('r') {
-    10
-  } else {
-    tile_id[1..].parse::<u8>().map_err(|_| format!("未知数牌：{tile_id}"))?
-  };
-  if !(1..=10).contains(&number) {
-    return Err(format!("未知数牌：{tile_id}"));
-  }
-
-  Ok(Tile { number, tile_type })
-}
-
-fn parse_honor(tile_id: &str) -> Result<Tile, String> {
-  let number = tile_id[1..].parse::<u8>().map_err(|_| format!("未知字牌：{tile_id}"))?;
-  match number {
-    1..=4 => Ok(Tile {
-      number,
-      tile_type: TileType::Wind,
+  match tile_id {
+    "0m" => Ok(Tile {
+      number: 10,
+      tile_type: TileType::Manzu,
     }),
-    5..=7 => Ok(Tile {
-      number: number - 4,
-      tile_type: TileType::Dragon,
+    "0p" => Ok(Tile {
+      number: 10,
+      tile_type: TileType::Pinzu,
     }),
-    _ => Err(format!("未知字牌：{tile_id}")),
+    "0s" => Ok(Tile {
+      number: 10,
+      tile_type: TileType::Souzu,
+    }),
+    _ => Tile::from_str(tile_id).map_err(|err| format!("未知牌 ID：{tile_id} ({err:?})")),
   }
 }
 
@@ -91,38 +69,38 @@ mod tests {
   use super::*;
 
   #[test]
-  fn maps_number_tiles_and_red_fives() {
-    let tile = parse_tile_id("m5r").unwrap();
+  fn parses_number_tiles_and_red_fives() {
+    let tile = parse_tile_id("0m").unwrap();
     assert_eq!(tile.number, 10);
     assert_eq!(tile.tile_type, TileType::Manzu);
 
-    let tile = parse_tile_id("p9").unwrap();
+    let tile = parse_tile_id("9p").unwrap();
     assert_eq!(tile.number, 9);
     assert_eq!(tile.tile_type, TileType::Pinzu);
   }
 
   #[test]
-  fn maps_honor_tiles() {
-    assert_eq!(parse_tile_id("z1").unwrap().tile_type, TileType::Wind);
-    assert_eq!(parse_tile_id("z5").unwrap().tile_type, TileType::Dragon);
-    assert_eq!(parse_tile_id("z5").unwrap().number, 1);
+  fn parses_honor_tiles() {
+    assert_eq!(parse_tile_id("1z").unwrap().tile_type, TileType::Wind);
+    assert_eq!(parse_tile_id("5z").unwrap().tile_type, TileType::Dragon);
+    assert_eq!(parse_tile_id("5z").unwrap().number, 1);
   }
 
   #[test]
   fn rejects_flower_and_invalid_tiles() {
-    assert!(parse_tile_id("f1").is_err());
+    assert!(parse_tile_id("1f").is_err());
     assert!(parse_tile_id("x1").is_err());
     assert!(parse_tile_id("m0").is_err());
-    assert!(parse_tile_id("z8").is_err());
+    assert!(parse_tile_id("8z").is_err());
   }
 
   #[test]
   fn converts_dora_indicators() {
-    assert_eq!(dora_from_indicator("m9").unwrap().number, 1);
-    assert_eq!(dora_from_indicator("z4").unwrap().number, 1);
-    assert_eq!(dora_from_indicator("z5").unwrap().number, 2);
-    assert_eq!(dora_from_indicator("z6").unwrap().number, 3);
-    assert_eq!(dora_from_indicator("z7").unwrap().number, 1);
-    assert_eq!(dora_from_indicator("m5r").unwrap().number, 6);
+    assert_eq!(dora_from_indicator("9m").unwrap().number, 1);
+    assert_eq!(dora_from_indicator("4z").unwrap().number, 1);
+    assert_eq!(dora_from_indicator("5z").unwrap().number, 2);
+    assert_eq!(dora_from_indicator("6z").unwrap().number, 3);
+    assert_eq!(dora_from_indicator("7z").unwrap().number, 1);
+    assert_eq!(dora_from_indicator("0m").unwrap().number, 6);
   }
 }
