@@ -23,5 +23,5 @@ tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
-riichi-calc = { git = "https://github.com/breezing-contrib/riichi-calc.git", rev = "5866e9b5f685e35ac6b800a68054342514b4bf14" }
-tract-onnx = "0.21"
+riichi-calc = { git = "https://github.com/breezing-contrib/riichi-calc.git" }
+tract-onnx = "0.22.1"
