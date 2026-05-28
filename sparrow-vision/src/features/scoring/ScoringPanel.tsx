@@ -36,9 +36,9 @@ export function ScoringPanel({
         <label>
           场风
           <select
-            value={request.round_wind}
+            value={request.bakaze}
             onChange={(event) =>
-              onChange({ ...request, round_wind: event.currentTarget.value as WindInput })
+              onChange({ ...request, bakaze: event.currentTarget.value as WindInput })
             }
           >
             {WIND_OPTIONS.map(([value, label]) => (
@@ -51,9 +51,9 @@ export function ScoringPanel({
         <label>
           自风
           <select
-            value={request.self_wind}
+            value={request.zikaze}
             onChange={(event) =>
-              onChange({ ...request, self_wind: event.currentTarget.value as WindInput })
+              onChange({ ...request, zikaze: event.currentTarget.value as WindInput })
             }
           >
             {WIND_OPTIONS.map(([value, label]) => (
@@ -132,13 +132,13 @@ export function ScoringPanel({
       </div>
       <IndicatorEditor
         label="宝牌指示牌"
-        tiles={request.dora_indicators}
-        onChange={(tiles) => onChange({ ...request, dora_indicators: tiles })}
+        tiles={request.dora}
+        onChange={(tiles) => onChange({ ...request, dora: tiles })}
       />
       <IndicatorEditor
         label="里宝牌指示牌"
-        tiles={request.ura_dora_indicators}
-        onChange={(tiles) => onChange({ ...request, ura_dora_indicators: tiles })}
+        tiles={request.ura_dora}
+        onChange={(tiles) => onChange({ ...request, ura_dora: tiles })}
       />
       <ResultView result={result} />
     </section>
@@ -212,13 +212,13 @@ function ResultView({ result }: { result: ScoringResult | null }) {
         <strong>{result.han} 番</strong>
         <strong>{result.fu} 符</strong>
       </div>
-      {result.score_breakdown && result.score_breakdown.ron_points > 0 ? (
-        <p>荣和 {result.score_breakdown.ron_points} 点</p>
+      {result.ron_points ? (
+        <p>荣和 {result.ron_points} 点</p>
       ) : null}
-      {result.score_breakdown?.tsumo_points ? (
+      {result.tsumo_points ? (
         <p>
-          自摸 庄家 {result.score_breakdown.tsumo_points.dealer} / 闲家{" "}
-          {result.score_breakdown.tsumo_points.non_dealer}
+          自摸 庄家 {result.tsumo_points.dealer} / 闲家{" "}
+          {result.tsumo_points.non_dealer}
         </p>
       ) : null}
       <div className="yaku-list">

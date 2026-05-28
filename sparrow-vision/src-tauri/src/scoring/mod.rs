@@ -1,8 +1,5 @@
-mod adapter;
 mod calculator;
 mod melds;
-mod points;
-mod request;
 mod tiles;
 mod yaku;
 

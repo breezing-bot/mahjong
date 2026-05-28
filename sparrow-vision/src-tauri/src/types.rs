@@ -84,17 +84,28 @@ pub struct SpecialWinInput {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnalyzeHandRequest {
-  pub hand_tiles: Vec<TileId>,
-  pub winning_tile: Option<TileId>,
-  pub melds: Vec<MeldInput>,
-  pub self_wind: WindInput,
-  pub round_wind: WindInput,
+  /// 闭手牌，不包含和了牌；对应 PiInput.hand。
+  pub hand: Vec<TileId>,
+  /// 和了牌，对应 riichi-calc 的 hora。
+  pub hora: TileId,
+  /// 副露面子，包括吃、碰、明杠、暗杠；对应 PiInput.naki。
+  pub naki: Vec<MeldInput>,
+  /// 自风，也就是玩家座风；对应 Field.zikaze。
+  pub zikaze: WindInput,
+  /// 场风；对应 Field.bakaze。
+  pub bakaze: WindInput,
+  /// 和牌方式：荣和或自摸。
   pub win_method: WinMethodInput,
+  /// 立直状态：无立直、立直或双立直。
   pub riichi: RiichiInput,
+  /// 一发、抢杠、岭上、海底等特殊役状态；对应 Status.special_win。
   pub special_win: SpecialWinInput,
+  /// 本场数；对应 Field.honba。
   pub honba: u8,
-  pub dora_indicators: Vec<TileId>,
-  pub ura_dora_indicators: Vec<TileId>,
+  /// 宝牌指示牌，后端会转换为实际宝牌；对应 Field.dora。
+  pub dora: Vec<TileId>,
+  /// 里宝牌指示牌，仅在立直相关状态下参与计算；对应 RiichiStatus 中的 ura dora。
+  pub ura_dora: Vec<TileId>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -111,19 +122,13 @@ pub struct TsumoPoints {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScoreBreakdown {
-  pub base_points: u32,
-  pub ron_points: u32,
-  pub tsumo_points: Option<TsumoPoints>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScoringResult {
   pub is_win: bool,
   pub yaku: Vec<YakuResult>,
   pub han: u8,
   pub fu: u8,
-  pub score_breakdown: Option<ScoreBreakdown>,
+  pub ron_points: Option<u32>,
+  pub tsumo_points: Option<TsumoPoints>,
   pub waits: Vec<String>,
   pub errors: Vec<String>,
 }

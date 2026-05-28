@@ -90,17 +90,28 @@ export interface SpecialWinInput {
 }
 
 export interface AnalyzeHandRequest {
-  hand_tiles: TileId[];
-  winning_tile: TileId | null;
-  melds: MeldInput[];
-  self_wind: WindInput;
-  round_wind: WindInput;
+  /** 闭手牌，不包含和了牌；对应 PiInput.hand。 */
+  hand: TileId[];
+  /** 和了牌，对应 riichi-calc 的 hora。 */
+  hora: TileId;
+  /** 副露面子，包括吃、碰、明杠、暗杠；对应 PiInput.naki。 */
+  naki: MeldInput[];
+  /** 自风，也就是玩家座风；对应 Field.zikaze。 */
+  zikaze: WindInput;
+  /** 场风；对应 Field.bakaze。 */
+  bakaze: WindInput;
+  /** 和牌方式：荣和或自摸。 */
   win_method: WinMethodInput;
+  /** 立直状态：无立直、立直或双立直。 */
   riichi: RiichiInput;
+  /** 一发、抢杠、岭上、海底等特殊役状态；对应 Status.special_win。 */
   special_win: SpecialWinInput;
+  /** 本场数；对应 Field.honba。 */
   honba: number;
-  dora_indicators: TileId[];
-  ura_dora_indicators: TileId[];
+  /** 宝牌指示牌，后端会转换为实际宝牌；对应 Field.dora。 */
+  dora: TileId[];
+  /** 里宝牌指示牌，仅在立直相关状态下参与计算；对应 RiichiStatus 中的 ura dora。 */
+  ura_dora: TileId[];
 }
 
 export interface ScoringResult {
@@ -108,11 +119,8 @@ export interface ScoringResult {
   yaku: Array<{ id: string; name: string; han: number }>;
   han: number;
   fu: number;
-  score_breakdown: {
-    base_points: number;
-    ron_points: number;
-    tsumo_points: { dealer: number; non_dealer: number } | null;
-  } | null;
+  ron_points: number | null;
+  tsumo_points: { dealer: number; non_dealer: number } | null;
   waits: string[];
   errors: string[];
 }

@@ -3,7 +3,7 @@
   "$id": "mahjong.scoring-result.v1",
   "title": "AnalyzeHandResult",
   "type": "object",
-  "required": ["is_win", "yaku", "han", "fu", "waits", "errors"],
+  "required": ["is_win", "yaku", "han", "fu", "ron_points", "tsumo_points", "waits", "errors"],
   "properties": {
     "is_win": { "type": "boolean" },
     "yaku": {
@@ -20,20 +20,13 @@
     },
     "han": { "type": "integer", "minimum": 0 },
     "fu": { "type": "integer", "minimum": 0 },
-    "score_breakdown": {
+    "ron_points": { "type": ["integer", "null"] },
+    "tsumo_points": {
       "type": ["object", "null"],
-      "required": ["base_points", "ron_points", "tsumo_points"],
+      "required": ["dealer", "non_dealer"],
       "properties": {
-        "base_points": { "type": "integer" },
-        "ron_points": { "type": "integer" },
-        "tsumo_points": {
-          "type": ["object", "null"],
-          "required": ["dealer", "non_dealer"],
-          "properties": {
-            "dealer": { "type": "integer" },
-            "non_dealer": { "type": "integer" }
-          }
-        }
+        "dealer": { "type": "integer" },
+        "non_dealer": { "type": "integer" }
       }
     },
     "waits": {
@@ -46,4 +39,3 @@
     }
   }
 }
-

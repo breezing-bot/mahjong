@@ -14,11 +14,11 @@ import type {
 } from "./shared/types";
 
 const DEFAULT_REQUEST: AnalyzeHandRequest = {
-  hand_tiles: [],
-  winning_tile: null,
-  melds: [],
-  self_wind: "east",
-  round_wind: "east",
+  hand: [],
+  hora: "1m",
+  naki: [],
+  zikaze: "east",
+  bakaze: "east",
   win_method: "ron",
   riichi: "none",
   special_win: {
@@ -30,8 +30,8 @@ const DEFAULT_REQUEST: AnalyzeHandRequest = {
     first_turn_tsumo: false,
   },
   honba: 0,
-  dora_indicators: [],
-  ura_dora_indicators: [],
+  dora: [],
+  ura_dora: [],
 };
 
 function App() {
@@ -64,10 +64,10 @@ function App() {
       setRecognition(nextRecognition);
       setRequest((current) => ({
         ...current,
-        hand_tiles: nextRecognition.hand_tiles,
-        winning_tile:
+        hand: nextRecognition.hand_tiles,
+        hora:
           nextRecognition.hand_tiles[nextRecognition.hand_tiles.length - 1] ??
-          current.winning_tile,
+          current.hora,
       }));
       const handSet = new Set(nextRecognition.hand_tiles);
       setPendingTiles(
@@ -92,7 +92,8 @@ function App() {
         yaku: [],
         han: 0,
         fu: 0,
-        score_breakdown: null,
+        ron_points: null,
+        tsumo_points: null,
         waits: [],
         errors: [error instanceof Error ? error.message : String(error)],
       });
@@ -111,7 +112,8 @@ function App() {
         yaku: [],
         han: 0,
         fu: 0,
-        score_breakdown: null,
+        ron_points: null,
+        tsumo_points: null,
         waits: [],
         errors: [error instanceof Error ? error.message : String(error)],
       });
@@ -128,8 +130,8 @@ function App() {
           <p>{status}</p>
         </div>
         <div className="topbar-stats">
-          <span>{request.hand_tiles.length} 手牌</span>
-          <span>{request.melds.length} 副露</span>
+          <span>{request.hand.length} 手牌</span>
+          <span>{request.naki.length} 副露</span>
         </div>
       </header>
       <div className="workspace">
@@ -142,19 +144,19 @@ function App() {
           <RecognitionPreview imageUrl={imageUrl} recognition={recognition} />
         </div>
         <HandEditor
-          handTiles={request.hand_tiles}
-          melds={request.melds}
+          handTiles={request.hand}
+          melds={request.naki}
           pendingTiles={pendingTiles}
-          winningTile={request.winning_tile}
-          onHandTilesChange={(hand_tiles) =>
-            setRequest((current) => ({ ...current, hand_tiles }))
+          winningTile={request.hora}
+          onHandTilesChange={(hand) =>
+            setRequest((current) => ({ ...current, hand }))
           }
-          onMeldsChange={(melds: MeldInput[]) =>
-            setRequest((current) => ({ ...current, melds }))
+          onMeldsChange={(naki: MeldInput[]) =>
+            setRequest((current) => ({ ...current, naki }))
           }
           onPendingTilesChange={setPendingTiles}
-          onWinningTileChange={(winning_tile) =>
-            setRequest((current) => ({ ...current, winning_tile }))
+          onWinningTileChange={(hora) =>
+            setRequest((current) => ({ ...current, hora }))
           }
         />
         <ScoringPanel

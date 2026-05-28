@@ -4,11 +4,11 @@ import { SCORING_TILE_IDS, tileLabel } from "../../shared/tiles";
 
 interface HandEditorProps {
   handTiles: TileId[];
-  winningTile: TileId | null;
+  winningTile: TileId;
   melds: MeldInput[];
   pendingTiles: TileId[];
   onHandTilesChange: (tiles: TileId[]) => void;
-  onWinningTileChange: (tile: TileId | null) => void;
+  onWinningTileChange: (tile: TileId) => void;
   onMeldsChange: (melds: MeldInput[]) => void;
   onPendingTilesChange: (tiles: TileId[]) => void;
 }
@@ -57,9 +57,9 @@ function TileRack({
 }: {
   title: string;
   tiles: TileId[];
-  winningTile: TileId | null;
+  winningTile: TileId;
   onTilesChange: (tiles: TileId[]) => void;
-  onWinningTileChange: (tile: TileId | null) => void;
+  onWinningTileChange: (tile: TileId) => void;
 }) {
   return (
     <div className="rack">
@@ -76,9 +76,7 @@ function TileRack({
             <TileBadge
               selected={winningTile === tile}
               tile={tile}
-              onClick={() =>
-                onWinningTileChange(winningTile === tile ? null : tile)
-              }
+              onClick={() => onWinningTileChange(tile)}
             />
             <select
               aria-label="修改牌"
