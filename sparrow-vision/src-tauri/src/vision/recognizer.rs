@@ -1,22 +1,30 @@
 use super::{hand, model, output, preprocess, yolo};
 use crate::types::RecognitionResult;
+use ort::{inputs, value::TensorRef};
 use tauri::AppHandle;
-use tract_onnx::prelude::*;
 
 pub fn recognize_image(image_bytes: &[u8], app: &AppHandle) -> Result<RecognitionResult, String> {
   let image = image::load_from_memory(image_bytes).map_err(|err| format!("图片解码失败：{err}"))?;
   let (input, letterbox) = preprocess::prepare_input(image);
   let model = model::cached_model(app, super::INPUT_SIZE)?;
 
-  let tensor = Tensor::from_shape(&[1, 3, super::INPUT_SIZE as usize, super::INPUT_SIZE as usize], &input)
-    .map_err(|err| err.to_string())?;
-  let outputs = model.run(tvec!(tensor.into())).map_err(|err| err.to_string())?;
-  let output = outputs[0].to_array_view::<f32>().map_err(|err| err.to_string())?;
+  let tensor = input_tensor(&input)?;
+  let mut session = model.lock().map_err(|_| "模型会话锁定失败".to_string())?;
+  let outputs = session.run(inputs![tensor]).map_err(|err| err.to_string())?;
+  let output = outputs[0].try_extract_array::<f32>().map_err(|err| err.to_string())?;
 
   let detections = yolo::parse_output(&output, &letterbox, super::CONFIDENCE_THRESHOLD);
   let layout = hand::infer_layout(&detections);
 
   Ok(output::recognition_result(detections, layout))
+}
+
+fn input_tensor(input: &[f32]) -> Result<TensorRef<'_, f32>, String> {
+  TensorRef::from_array_view((
+    [1usize, 3, super::INPUT_SIZE as usize, super::INPUT_SIZE as usize],
+    input,
+  ))
+  .map_err(|err| err.to_string())
 }
 
 pub fn recognize_image_or_unavailable(image_bytes: &[u8], app: &AppHandle) -> RecognitionResult {
@@ -28,12 +36,18 @@ mod debug_tests {
   use super::*;
   use crate::types::{BBox, Detection};
   use image::{Rgb, RgbImage};
+  use ndarray::{ArrayD, ArrayViewD};
   use std::env;
   use std::fs;
   use std::path::{Path, PathBuf};
   use std::time::Duration;
   use std::time::Instant;
-  use tract_onnx::prelude::tract_ndarray::{ArrayD, ArrayViewD};
+
+  #[test]
+  #[ignore = "prints the dynamically loaded ONNX Runtime build info"]
+  fn debug_ort_build_info() {
+    println!("{}", ort::info());
+  }
 
   #[test]
   #[ignore = "set SPARROW_VISION_DEBUG_IMAGE to an image path and run with --ignored --nocapture"]
@@ -109,7 +123,6 @@ mod debug_tests {
     let image = image::load_from_memory(&image_bytes)
       .unwrap_or_else(|err| panic!("failed to decode {}: {err}", image_path.display()));
     let (input, letterbox) = preprocess::prepare_input(image);
-    let tensor = input_tensor(&input);
     let model_path = model::source_model_path();
 
     let model_load_started = Instant::now();
@@ -124,17 +137,18 @@ mod debug_tests {
     println!("warmup_runs=1");
     println!("measured_runs={MEASURED_RUNS}");
 
+    let mut session = model.lock().unwrap();
+
     let warmup_started = Instant::now();
-    let _ = model.run(tvec!(tensor.clone().into())).unwrap();
+    let _ = run_inference(&mut session, &input).unwrap();
     println!("warmup_inference_ms={:.2}", duration_ms(warmup_started.elapsed()));
 
     let mut durations = Vec::with_capacity(MEASURED_RUNS);
     for run_index in 1..=MEASURED_RUNS {
       let inference_started = Instant::now();
-      let outputs = model.run(tvec!(tensor.clone().into())).unwrap();
+      let output = run_inference(&mut session, &input).unwrap();
       let duration = inference_started.elapsed();
-      let output = outputs[0].to_array_view::<f32>().unwrap();
-      let detections = yolo::parse_output(&output, &letterbox, super::super::CONFIDENCE_THRESHOLD);
+      let detections = yolo::parse_output(&output.view(), &letterbox, super::super::CONFIDENCE_THRESHOLD);
 
       println!(
         "inference_run_{run_index}_ms={:.2}, detection_count={}",
@@ -162,16 +176,15 @@ mod debug_tests {
     let image = image::load_from_memory(&image_bytes)
       .unwrap_or_else(|err| panic!("failed to decode {}: {err}", image_path.display()));
     let (input, letterbox) = preprocess::prepare_input(image);
-    let tensor = input_tensor(&input);
     let model_path = model::source_model_path();
     let model_load_started = Instant::now();
     let model = model::load_model_from_path(model_path.clone(), super::super::INPUT_SIZE)
       .unwrap_or_else(|err| panic!("failed to load {}: {err}", model_path.display()));
     let model_load_duration = model_load_started.elapsed();
+    let mut session = model.lock().unwrap();
     let inference_started = Instant::now();
-    let outputs = model.run(tvec!(tensor.into())).unwrap();
+    let model_output = run_inference(&mut session, &input).unwrap();
     let inference_duration = inference_started.elapsed();
-    let model_output = outputs[0].to_array_view::<f32>().unwrap().to_owned().into_dyn();
 
     DebugRun {
       image_bytes,
@@ -183,17 +196,18 @@ mod debug_tests {
     }
   }
 
-  fn input_tensor(input: &[f32]) -> Tensor {
-    Tensor::from_shape(
-      &[
-        1,
+  fn run_inference(session: &mut ort::session::Session, input: &[f32]) -> ort::Result<ArrayD<f32>> {
+    let tensor = TensorRef::from_array_view((
+      [
+        1usize,
         3,
         super::super::INPUT_SIZE as usize,
         super::super::INPUT_SIZE as usize,
       ],
       input,
-    )
-    .unwrap()
+    ))?;
+    let outputs = session.run(inputs![tensor])?;
+    Ok(outputs[0].try_extract_array::<f32>()?.to_owned().into_dyn())
   }
 
   fn draw_bbox(image: &mut RgbImage, bbox: &BBox, color: Rgb<u8>) {

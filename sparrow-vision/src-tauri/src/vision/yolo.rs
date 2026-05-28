@@ -1,7 +1,7 @@
 use super::preprocess::Letterbox;
 use crate::tile_vocab::TILE_IDS;
 use crate::types::{BBox, Detection};
-use tract_onnx::prelude::tract_ndarray::ArrayViewD;
+use ndarray::ArrayViewD;
 
 #[derive(Debug, Clone, Copy)]
 struct DetectionRow {
@@ -13,9 +13,7 @@ struct DetectionRow {
   class_id: f32,
 }
 
-pub fn parse_output(
-  output: &ArrayViewD<f32>, letterbox: &Letterbox, confidence_threshold: f32,
-) -> Vec<Detection> {
+pub fn parse_output(output: &ArrayViewD<f32>, letterbox: &Letterbox, confidence_threshold: f32) -> Vec<Detection> {
   let shape = output.shape();
   let mut candidates = Vec::new();
 
@@ -104,7 +102,7 @@ fn remap_corners_bbox(x1: f32, y1: f32, x2: f32, y2: f32, letterbox: &Letterbox)
 #[cfg(test)]
 mod tests {
   use super::*;
-  use tract_onnx::prelude::tract_ndarray::Array;
+  use ndarray::Array;
 
   fn letterbox() -> Letterbox {
     Letterbox {

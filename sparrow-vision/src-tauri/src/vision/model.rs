@@ -1,9 +1,10 @@
 use std::path::PathBuf;
-use std::sync::{Arc, OnceLock};
-use tauri::{path::BaseDirectory, AppHandle, Manager};
-use tract_onnx::prelude::*;
+use std::sync::{Arc, Mutex, OnceLock};
 
-type VisionModel = Arc<TypedRunnableModel<TypedModel>>;
+use ort::session::Session;
+use tauri::{path::BaseDirectory, AppHandle, Manager};
+
+pub(crate) type VisionModel = Arc<Mutex<Session>>;
 static MODEL: OnceLock<VisionModel> = OnceLock::new();
 
 pub fn cached_model(app: &AppHandle, input_size: u32) -> Result<VisionModel, String> {
@@ -25,17 +26,12 @@ fn load_onnx_model(app: &AppHandle, input_size: u32) -> Result<VisionModel, Stri
   load_model_from_path(model_path(app), input_size)
 }
 
-pub(crate) fn load_model_from_path(model_path: PathBuf, input_size: u32) -> Result<VisionModel, String> {
-  let model = tract_onnx::onnx()
-    .model_for_path(model_path)
-    .map_err(|err| format!("加载 ONNX 模型失败：{err}"))?
-    .with_input_fact(0, f32::fact([1, 3, input_size as usize, input_size as usize]).into())
-    .map_err(|err| err.to_string())?
-    .into_optimized()
-    .map_err(|err| err.to_string())?
-    .into_runnable()
-    .map_err(|err| err.to_string())?;
-  Ok(Arc::new(model))
+pub(crate) fn load_model_from_path(model_path: PathBuf, _input_size: u32) -> Result<VisionModel, String> {
+  let mut builder = Session::builder().map_err(|err| format!("创建 ONNX Runtime Session 失败：{err}"))?;
+  let session = builder
+    .commit_from_file(&model_path)
+    .map_err(|err| format!("加载 ONNX 模型失败（{}）：{err}", model_path.display()))?;
+  Ok(Arc::new(Mutex::new(session)))
 }
 
 fn model_path(app: &AppHandle) -> PathBuf {

@@ -1,10 +1,7 @@
 use crate::types::{Detection, RecognitionLayout, RecognitionResult};
 
 pub fn recognition_result(detections: Vec<Detection>, layout: RecognitionLayout) -> RecognitionResult {
-  RecognitionResult {
-    detections,
-    layout,
-  }
+  RecognitionResult { detections, layout }
 }
 
 pub fn unavailable_result() -> RecognitionResult {

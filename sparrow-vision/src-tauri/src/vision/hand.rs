@@ -99,7 +99,10 @@ fn infer_naki(tiles: Vec<&Detection>, median_width: f32, median_height: f32) -> 
 
   let mut rows: Vec<Vec<&Detection>> = Vec::new();
   for tile in remaining {
-    if let Some(row) = rows.iter_mut().find(|row| (center_y(row[0]) - center_y(tile)).abs() <= median_height * 0.9) {
+    if let Some(row) = rows
+      .iter_mut()
+      .find(|row| (center_y(row[0]) - center_y(tile)).abs() <= median_height * 0.9)
+    {
       row.push(tile);
     } else {
       rows.push(vec![tile]);
@@ -113,9 +116,9 @@ fn infer_naki(tiles: Vec<&Detection>, median_width: f32, median_height: f32) -> 
     row.sort_by(compare_left);
     let mut current: Vec<&Detection> = Vec::new();
     for tile in row {
-      let starts_new_group = current.last().is_some_and(|last| {
-        tile.bbox.x - (last.bbox.x + last.bbox.width) > median_width.max(1.0) * 1.25
-      });
+      let starts_new_group = current
+        .last()
+        .is_some_and(|last| tile.bbox.x - (last.bbox.x + last.bbox.width) > median_width.max(1.0) * 1.25);
       if starts_new_group {
         push_meld_or_unassigned(&mut naki, &mut unassigned, current);
         current = Vec::new();
@@ -158,7 +161,11 @@ fn infer_meld_kind(group: &[&Detection]) -> (RecognitionMeldKind, bool) {
 fn same_tile(group: &[&Detection]) -> bool {
   group
     .first()
-    .map(|first| group.iter().all(|tile| normalized_tile(&tile.tile_id) == normalized_tile(&first.tile_id)))
+    .map(|first| {
+      group
+        .iter()
+        .all(|tile| normalized_tile(&tile.tile_id) == normalized_tile(&first.tile_id))
+    })
     .unwrap_or(false)
 }
 
@@ -168,7 +175,10 @@ fn is_sequence(group: &[&Detection]) -> bool {
     return false;
   }
 
-  let mut numbers: Vec<u8> = group.iter().filter_map(|tile| normalized_number(&tile.tile_id)).collect();
+  let mut numbers: Vec<u8> = group
+    .iter()
+    .filter_map(|tile| normalized_number(&tile.tile_id))
+    .collect();
   numbers.sort_unstable();
   numbers.len() == 3 && numbers[0] + 1 == numbers[1] && numbers[1] + 1 == numbers[2]
 }
@@ -187,7 +197,8 @@ fn normalized_number(tile_id: &str) -> Option<u8> {
 }
 
 fn tiles_by_ids<'a>(tiles: &'a [Detection], ids: &[u32]) -> Vec<&'a Detection> {
-  ids.iter()
+  ids
+    .iter()
     .filter_map(|id| tiles.iter().find(|tile| tile.id == *id))
     .collect()
 }
