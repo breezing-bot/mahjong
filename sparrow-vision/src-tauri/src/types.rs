@@ -12,25 +12,42 @@ pub struct BBox {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Detection {
+  pub id: u32,
   pub tile_id: TileId,
   pub confidence: f32,
   pub bbox: BBox,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RecognitionDiagnostics {
-  pub raw_detection_count: usize,
-  pub kept_detection_count: usize,
-  pub dropped_low_confidence_count: usize,
-  pub dropped_unknown_class_count: usize,
+#[serde(rename_all = "snake_case")]
+pub enum RecognitionMeldKind {
+  Chi,
+  Pon,
+  Daiminkan,
+  Ankan,
+  Unknown,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecognitionMeld {
+  pub id: String,
+  pub kind: RecognitionMeldKind,
+  pub tiles: Vec<u32>,
+  pub needs_confirmation: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecognitionLayout {
+  pub hand: Vec<u32>,
+  pub hora: Option<u32>,
+  pub naki: Vec<RecognitionMeld>,
+  pub unassigned: Vec<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecognitionResult {
   pub detections: Vec<Detection>,
-  pub hand_tiles: Vec<TileId>,
-  pub quality_flags: Vec<String>,
-  pub diagnostics: RecognitionDiagnostics,
+  pub layout: RecognitionLayout,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -13,10 +13,10 @@ pub fn recognize_image(image_bytes: &[u8], app: &AppHandle) -> Result<Recognitio
   let outputs = model.run(tvec!(tensor.into())).map_err(|err| err.to_string())?;
   let output = outputs[0].to_array_view::<f32>().map_err(|err| err.to_string())?;
 
-  let (detections, diagnostics) = yolo::parse_output(&output, &letterbox, super::CONFIDENCE_THRESHOLD);
-  let hand_tiles = hand::infer_hand_tiles(&detections);
+  let detections = yolo::parse_output(&output, &letterbox, super::CONFIDENCE_THRESHOLD);
+  let layout = hand::infer_layout(&detections);
 
-  Ok(output::recognition_result(detections, hand_tiles, diagnostics))
+  Ok(output::recognition_result(detections, layout))
 }
 
 pub fn recognize_image_or_unavailable(image_bytes: &[u8], app: &AppHandle) -> RecognitionResult {
@@ -66,19 +66,17 @@ mod debug_tests {
     let (_, _, letterbox, model_output) = run_model_for_debug(&image_path);
     print_detection_rows(&model_output.view());
 
-    let (detections, diagnostics) =
-      yolo::parse_output(&model_output.view(), &letterbox, super::super::CONFIDENCE_THRESHOLD);
+    let detections = yolo::parse_output(&model_output.view(), &letterbox, super::super::CONFIDENCE_THRESHOLD);
     println!("detection_count={}", detections.len());
     println!(
       "detections_sample={:#?}",
       detections.iter().take(16).collect::<Vec<_>>()
     );
-    println!("diagnostics_after_parse={diagnostics:#?}");
 
-    let hand_tiles = hand::infer_hand_tiles(&detections);
-    println!("hand_tiles={hand_tiles:#?}");
+    let layout = hand::infer_layout(&detections);
+    println!("layout={layout:#?}");
 
-    let result = output::recognition_result(detections, hand_tiles, diagnostics);
+    let result = output::recognition_result(detections, layout);
     println!(
       "recognition_result_json={}",
       serde_json::to_string_pretty(&result).unwrap()
@@ -94,10 +92,9 @@ mod debug_tests {
     };
 
     let (image_bytes, _, letterbox, model_output) = run_model_for_debug(&image_path);
-    let (detections, diagnostics) =
-      yolo::parse_output(&model_output.view(), &letterbox, super::super::CONFIDENCE_THRESHOLD);
-    let hand_tiles = hand::infer_hand_tiles(&detections);
-    let result = output::recognition_result(detections, hand_tiles, diagnostics);
+    let detections = yolo::parse_output(&model_output.view(), &letterbox, super::super::CONFIDENCE_THRESHOLD);
+    let layout = hand::infer_layout(&detections);
+    let result = output::recognition_result(detections, layout);
 
     let mut annotated = image::load_from_memory(&image_bytes)
       .unwrap_or_else(|err| panic!("failed to decode {}: {err}", image_path.display()))
@@ -114,7 +111,7 @@ mod debug_tests {
     println!("image_path={}", image_path.display());
     println!("annotated_output_path={}", output_path.display());
     println!("detection_count={}", result.detections.len());
-    println!("hand_tiles={:#?}", result.hand_tiles);
+    println!("layout={:#?}", result.layout);
   }
 
   fn run_model_for_debug(image_path: &Path) -> (Vec<u8>, Vec<f32>, preprocess::Letterbox, ArrayD<f32>) {

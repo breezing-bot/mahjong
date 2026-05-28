@@ -7,7 +7,8 @@ import { ImageUpload } from "./features/upload/ImageUpload";
 import { analyzeHand, recognizeImage } from "./shared/api";
 import type {
   AnalyzeHandRequest,
-  MeldInput,
+  MeldKind,
+  RecognitionMeld,
   RecognitionResult,
   ScoringResult,
   TileId,
@@ -37,17 +38,17 @@ const DEFAULT_REQUEST: AnalyzeHandRequest = {
 function App() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [recognition, setRecognition] = useState<RecognitionResult | null>(null);
+  const [selectedTileId, setSelectedTileId] = useState<number | null>(null);
   const [request, setRequest] = useState<AnalyzeHandRequest>(DEFAULT_REQUEST);
-  const [pendingTiles, setPendingTiles] = useState<TileId[]>([]);
   const [result, setResult] = useState<ScoringResult | null>(null);
   const [busy, setBusy] = useState<"idle" | "recognizing" | "scoring">("idle");
 
   const status = useMemo(() => {
-    if (busy === "recognizing") return "正在识别照片";
-    if (busy === "scoring") return "正在计算番符";
-    if (result?.errors.length) return "需要修正输入";
-    if (result?.is_win) return "计算完成";
-    return "等待照片或手动录入";
+    if (busy === "recognizing") return "Recognizing photo";
+    if (busy === "scoring") return "Calculating score";
+    if (result?.errors.length) return "Input needs review";
+    if (result?.is_win) return "Score complete";
+    return "Waiting for photo or manual input";
   }, [busy, result]);
 
   async function handleFile(file: File) {
@@ -62,29 +63,16 @@ function App() {
     try {
       const nextRecognition = await recognizeImage(file);
       setRecognition(nextRecognition);
-      setRequest((current) => ({
-        ...current,
-        hand: nextRecognition.hand_tiles,
-        hora:
-          nextRecognition.hand_tiles[nextRecognition.hand_tiles.length - 1] ??
-          current.hora,
-      }));
-      const handSet = new Set(nextRecognition.hand_tiles);
-      setPendingTiles(
-        nextRecognition.detections
-          .map((detection) => detection.tile_id)
-          .filter((tile) => !handSet.has(tile)),
-      );
+      setSelectedTileId(nextRecognition.layout.hora);
+      setRequest((current) => requestFromRecognition(current, nextRecognition));
     } catch (error) {
       setRecognition({
         detections: [],
-        hand_tiles: [],
-        quality_flags: ["model_unavailable"],
-        diagnostics: {
-          raw_detection_count: 0,
-          kept_detection_count: 0,
-          dropped_low_confidence_count: 0,
-          dropped_unknown_class_count: 0,
+        layout: {
+          hand: [],
+          hora: null,
+          naki: [],
+          unassigned: [],
         },
       });
       setResult({
@@ -103,6 +91,21 @@ function App() {
   }
 
   async function handleAnalyze() {
+    const validationErrors = recognition ? recognitionValidationErrors(recognition) : [];
+    if (validationErrors.length > 0) {
+      setResult({
+        is_win: false,
+        yaku: [],
+        han: 0,
+        fu: 0,
+        ron_points: null,
+        tsumo_points: null,
+        waits: [],
+        errors: validationErrors,
+      });
+      return;
+    }
+
     setBusy("scoring");
     try {
       setResult(await analyzeHand(request));
@@ -122,6 +125,12 @@ function App() {
     }
   }
 
+  function handleRecognitionChange(nextRecognition: RecognitionResult) {
+    setRecognition(nextRecognition);
+    setResult(null);
+    setRequest((current) => requestFromRecognition(current, nextRecognition));
+  }
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -130,8 +139,8 @@ function App() {
           <p>{status}</p>
         </div>
         <div className="topbar-stats">
-          <span>{request.hand.length} 手牌</span>
-          <span>{request.naki.length} 副露</span>
+          <span>{request.hand.length} closed</span>
+          <span>{request.naki.length} melds</span>
         </div>
       </header>
       <div className="workspace">
@@ -141,23 +150,18 @@ function App() {
             imageUrl={imageUrl}
             onFile={handleFile}
           />
-          <RecognitionPreview imageUrl={imageUrl} recognition={recognition} />
+          <RecognitionPreview
+            imageUrl={imageUrl}
+            recognition={recognition}
+            selectedTileId={selectedTileId}
+            onTileSelect={setSelectedTileId}
+          />
         </div>
         <HandEditor
-          handTiles={request.hand}
-          melds={request.naki}
-          pendingTiles={pendingTiles}
-          winningTile={request.hora}
-          onHandTilesChange={(hand) =>
-            setRequest((current) => ({ ...current, hand }))
-          }
-          onMeldsChange={(naki: MeldInput[]) =>
-            setRequest((current) => ({ ...current, naki }))
-          }
-          onPendingTilesChange={setPendingTiles}
-          onWinningTileChange={(hora) =>
-            setRequest((current) => ({ ...current, hora }))
-          }
+          recognition={recognition}
+          selectedTileId={selectedTileId}
+          onRecognitionChange={handleRecognitionChange}
+          onSelectedTileChange={setSelectedTileId}
         />
         <ScoringPanel
           busy={busy === "scoring"}
@@ -172,3 +176,47 @@ function App() {
 }
 
 export default App;
+
+function requestFromRecognition(
+  current: AnalyzeHandRequest,
+  recognition: RecognitionResult,
+): AnalyzeHandRequest {
+  const tiles = tileMap(recognition);
+  const hand = tileIdsToTileIds(recognition.layout.hand, tiles);
+  const hora =
+    (recognition.layout.hora !== null
+      ? tiles.get(recognition.layout.hora)?.tile_id
+      : undefined) ?? current.hora;
+  const naki = recognition.layout.naki
+    .filter((meld): meld is RecognitionMeld & { kind: MeldKind } => meld.kind !== "unknown")
+    .map((meld) => ({
+      kind: meld.kind,
+      tiles: tileIdsToTileIds(meld.tiles, tiles),
+    }));
+
+  return {
+    ...current,
+    hand,
+    hora,
+    naki,
+  };
+}
+
+function recognitionValidationErrors(recognition: RecognitionResult): string[] {
+  const errors: string[] = [];
+  if (recognition.layout.hora === null) {
+    errors.push("Please choose a winning tile before scoring.");
+  }
+  if (recognition.layout.naki.some((meld) => meld.kind === "unknown")) {
+    errors.push("Please confirm every meld type before scoring.");
+  }
+  return errors;
+}
+
+function tileMap(recognition: RecognitionResult) {
+  return new Map(recognition.detections.map((tile) => [tile.id, tile]));
+}
+
+function tileIdsToTileIds(ids: number[], tiles: Map<number, { tile_id: TileId }>): TileId[] {
+  return ids.map((id) => tiles.get(id)?.tile_id).filter(Boolean) as TileId[];
+}

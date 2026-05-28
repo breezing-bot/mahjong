@@ -1,6 +1,6 @@
 use super::preprocess::Letterbox;
 use crate::tile_vocab::TILE_IDS;
-use crate::types::{BBox, Detection, RecognitionDiagnostics};
+use crate::types::{BBox, Detection};
 use tract_onnx::prelude::tract_ndarray::ArrayViewD;
 
 #[derive(Debug, Clone, Copy)]
@@ -15,38 +15,34 @@ struct DetectionRow {
 
 pub fn parse_output(
   output: &ArrayViewD<f32>, letterbox: &Letterbox, confidence_threshold: f32,
-) -> (Vec<Detection>, RecognitionDiagnostics) {
+) -> Vec<Detection> {
   let shape = output.shape();
   let mut candidates = Vec::new();
-  let mut diagnostics = empty_diagnostics();
 
   if shape.len() != 3 {
-    return (candidates, diagnostics);
+    return candidates;
   }
 
   if shape[2] != 6 {
-    return (candidates, diagnostics);
+    return candidates;
   }
 
   let prediction_count = shape[1];
-  diagnostics.raw_detection_count = prediction_count;
 
   for index in 0..prediction_count {
     let Some((class_index, confidence, bbox_values)) = candidate_from_output(output, index) else {
-      diagnostics.dropped_unknown_class_count += 1;
       continue;
     };
     if confidence < confidence_threshold {
-      diagnostics.dropped_low_confidence_count += 1;
       continue;
     }
 
     let Some(tile_id) = TILE_IDS.get(class_index) else {
-      diagnostics.dropped_unknown_class_count += 1;
       continue;
     };
 
     candidates.push(Detection {
+      id: candidates.len() as u32,
       tile_id: tile_id.to_string(),
       confidence,
       bbox: remap_corners_bbox(
@@ -59,7 +55,7 @@ pub fn parse_output(
     });
   }
 
-  (candidates, diagnostics)
+  candidates
 }
 
 fn candidate_from_output(output: &ArrayViewD<f32>, index: usize) -> Option<(usize, f32, [f32; 4])> {
@@ -105,15 +101,6 @@ fn remap_corners_bbox(x1: f32, y1: f32, x2: f32, y2: f32, letterbox: &Letterbox)
   }
 }
 
-fn empty_diagnostics() -> RecognitionDiagnostics {
-  RecognitionDiagnostics {
-    raw_detection_count: 0,
-    kept_detection_count: 0,
-    dropped_low_confidence_count: 0,
-    dropped_unknown_class_count: 0,
-  }
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -149,10 +136,8 @@ mod tests {
     output[[0, 7, 4]] = 0.9;
     output[[0, 7, 5]] = 3.0;
 
-    let (detections, diagnostics) = parse_output(&output.into_dyn().view(), &letterbox(), 0.25);
+    let detections = parse_output(&output.into_dyn().view(), &letterbox(), 0.25);
 
-    assert_eq!(diagnostics.raw_detection_count, 300);
-    assert_eq!(diagnostics.dropped_low_confidence_count, 299);
     assert_eq!(detections.len(), 1);
     assert_eq!(detections[0].tile_id, "3m");
     assert_eq!(detections[0].confidence, 0.9);
@@ -170,20 +155,17 @@ mod tests {
     output[[0, 1, 4]] = 0.2;
     output[[0, 1, 5]] = 2.0;
 
-    let (detections, diagnostics) = parse_output(&output.into_dyn().view(), &letterbox(), 0.25);
+    let detections = parse_output(&output.into_dyn().view(), &letterbox(), 0.25);
 
     assert!(detections.is_empty());
-    assert_eq!(diagnostics.dropped_low_confidence_count, 2);
-    assert_eq!(diagnostics.dropped_unknown_class_count, 0);
   }
 
   #[test]
   fn ignores_unsupported_output_shape() {
     let output = Array::zeros((1, TILE_IDS.len() + 4, 8400));
 
-    let (detections, diagnostics) = parse_output(&output.into_dyn().view(), &letterbox(), 0.25);
+    let detections = parse_output(&output.into_dyn().view(), &letterbox(), 0.25);
 
     assert!(detections.is_empty());
-    assert_eq!(diagnostics.raw_detection_count, 0);
   }
 }

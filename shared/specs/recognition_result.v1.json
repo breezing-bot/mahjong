@@ -6,9 +6,7 @@
   "additionalProperties": false,
   "required": [
     "detections",
-    "hand_tiles",
-    "quality_flags",
-    "diagnostics"
+    "layout"
   ],
   "properties": {
     "detections": {
@@ -17,11 +15,16 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
+          "id",
           "tile_id",
           "confidence",
           "bbox"
         ],
         "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 0
+          },
           "tile_id": {
             "$ref": "tile_vocab.v1.json"
           },
@@ -49,38 +52,61 @@
         }
       }
     },
-    "hand_tiles": {
-      "type": "array",
-      "items": {
-        "$ref": "tile_vocab.v1.json"
-      }
-    },
-    "quality_flags": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "enum": [
-          "low_confidence_filtered",
-          "unknown_class_index",
-          "empty_model_output",
-          "model_unavailable"
-        ]
-      }
-    },
-    "diagnostics": {
+    "layout": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "raw_detection_count",
-        "kept_detection_count",
-        "dropped_low_confidence_count",
-        "dropped_unknown_class_count"
+        "hand",
+        "hora",
+        "naki",
+        "unassigned"
       ],
       "properties": {
-        "raw_detection_count": { "type": "integer", "minimum": 0 },
-        "kept_detection_count": { "type": "integer", "minimum": 0 },
-        "dropped_low_confidence_count": { "type": "integer", "minimum": 0 },
-        "dropped_unknown_class_count": { "type": "integer", "minimum": 0 }
+        "hand": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 }
+        },
+        "hora": {
+          "anyOf": [
+            { "type": "integer", "minimum": 0 },
+            { "type": "null" }
+          ]
+        },
+        "naki": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "kind",
+              "tiles",
+              "needs_confirmation"
+            ],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "chi",
+                  "pon",
+                  "daiminkan",
+                  "ankan",
+                  "unknown"
+                ]
+              },
+              "tiles": {
+                "type": "array",
+                "items": { "type": "integer", "minimum": 0 }
+              },
+              "needs_confirmation": { "type": "boolean" }
+            }
+          }
+        },
+        "unassigned": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0 }
+        }
       }
     }
   }

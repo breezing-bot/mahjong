@@ -1,48 +1,138 @@
-import type { MeldInput, MeldKind, TileId } from "../../shared/types";
+import type {
+  RecognitionMeld,
+  RecognitionMeldKind,
+  RecognitionResult,
+  TileId,
+} from "../../shared/types";
 import { TileBadge } from "../../shared/TileBadge";
 import { SCORING_TILE_IDS, tileLabel } from "../../shared/tiles";
 
 interface HandEditorProps {
-  handTiles: TileId[];
-  winningTile: TileId;
-  melds: MeldInput[];
-  pendingTiles: TileId[];
-  onHandTilesChange: (tiles: TileId[]) => void;
-  onWinningTileChange: (tile: TileId) => void;
-  onMeldsChange: (melds: MeldInput[]) => void;
-  onPendingTilesChange: (tiles: TileId[]) => void;
+  recognition: RecognitionResult | null;
+  selectedTileId: number | null;
+  onRecognitionChange: (recognition: RecognitionResult) => void;
+  onSelectedTileChange: (tileId: number | null) => void;
 }
 
 export function HandEditor({
-  handTiles,
-  winningTile,
-  melds,
-  pendingTiles,
-  onHandTilesChange,
-  onWinningTileChange,
-  onMeldsChange,
-  onPendingTilesChange,
+  recognition,
+  selectedTileId,
+  onRecognitionChange,
+  onSelectedTileChange,
 }: HandEditorProps) {
+  if (!recognition) {
+    return (
+      <section className="panel editor-panel">
+        <div className="panel-heading">
+          <h2>Hand editor</h2>
+          <span className="meta">No tiles</span>
+        </div>
+        <div className="result-empty">Upload a photo to edit recognized tiles.</div>
+      </section>
+    );
+  }
+
+  const tiles = tileMap(recognition);
+  const selectedTile = selectedTileId === null ? undefined : tiles.get(selectedTileId);
+
+  function update(next: RecognitionResult) {
+    onRecognitionChange(next);
+  }
+
+  function assignSelected(target: AssignmentTarget) {
+    if (selectedTileId === null) return;
+    update(assignTile(recognition!, selectedTileId, target));
+  }
+
   return (
     <section className="panel editor-panel">
       <div className="panel-heading">
-        <h2>牌面编辑</h2>
-        <span className="meta">{handTiles.length} 张手牌</span>
+        <h2>Hand editor</h2>
+        <span className="meta">{recognition.detections.length} recognized</span>
       </div>
+
+      <div className="assignment-bar">
+        <div>
+          <strong>{selectedTile ? tileLabel(selectedTile.tile_id) : "No tile selected"}</strong>
+          {selectedTile ? <span className="muted-text"> {selectedTile.id}</span> : null}
+        </div>
+        <div className="assignment-actions">
+          <button type="button" disabled={selectedTileId === null} onClick={() => assignSelected({ kind: "closed" })}>
+            Closed
+          </button>
+          <button type="button" disabled={selectedTileId === null} onClick={() => assignSelected({ kind: "winning" })}>
+            Winning
+          </button>
+          <button type="button" disabled={selectedTileId === null} onClick={() => assignSelected({ kind: "unassigned" })}>
+            Unassigned
+          </button>
+          <button type="button" disabled={selectedTileId === null} onClick={() => assignSelected({ kind: "new-meld" })}>
+            New meld
+          </button>
+        </div>
+      </div>
+
       <TileRack
-        title="手牌"
-        tiles={handTiles}
-        winningTile={winningTile}
-        onTilesChange={onHandTilesChange}
-        onWinningTileChange={onWinningTileChange}
+        title="Closed hand"
+        ids={recognition.layout.hand}
+        recognition={recognition}
+        selectedTileId={selectedTileId}
+        onSelect={onSelectedTileChange}
+        onChange={(ids) =>
+          update({ ...recognition, layout: { ...recognition.layout, hand: ids } })
+        }
+        onTileChange={(tileId, tile) => updateTile(recognition, tileId, tile, update)}
+        onRemove={(tileId) => update(assignTile(recognition, tileId, { kind: "unassigned" }))}
       />
-      <MeldEditor melds={melds} onChange={onMeldsChange} />
+
+      <div className="rack">
+        <div className="rack-heading">
+          <h3>Winning tile</h3>
+          <button
+            type="button"
+            disabled={recognition.layout.hora === null}
+            onClick={() => {
+              const tileId = recognition.layout.hora;
+              if (tileId !== null) update(assignTile(recognition, tileId, { kind: "unassigned" }));
+            }}
+          >
+            Clear
+          </button>
+        </div>
+        <div className="tile-row">
+          {recognition.layout.hora !== null ? (
+            <EditableTile
+              id={recognition.layout.hora}
+              recognition={recognition}
+              selected={selectedTileId === recognition.layout.hora}
+              onSelect={onSelectedTileChange}
+              onTileChange={(tileId, tile) => updateTile(recognition, tileId, tile, update)}
+              onRemove={(tileId) => update(assignTile(recognition, tileId, { kind: "unassigned" }))}
+            />
+          ) : (
+            <span className="result-empty">Choose one tile as winning.</span>
+          )}
+        </div>
+      </div>
+
+      <MeldEditor
+        recognition={recognition}
+        selectedTileId={selectedTileId}
+        onSelect={onSelectedTileChange}
+        onChange={update}
+      />
+
       <TileRack
-        title="待确认"
-        tiles={pendingTiles}
-        winningTile={winningTile}
-        onTilesChange={onPendingTilesChange}
-        onWinningTileChange={onWinningTileChange}
+        title="Unassigned"
+        ids={recognition.layout.unassigned}
+        recognition={recognition}
+        selectedTileId={selectedTileId}
+        onSelect={onSelectedTileChange}
+        onChange={(ids) =>
+          update({ ...recognition, layout: { ...recognition.layout, unassigned: ids } })
+        }
+        onTileChange={(tileId, tile) => updateTile(recognition, tileId, tile, update)}
+        onRemove={(tileId) => update(deleteTile(recognition, tileId))}
       />
     </section>
   );
@@ -50,189 +140,307 @@ export function HandEditor({
 
 function TileRack({
   title,
-  tiles,
-  winningTile,
-  onTilesChange,
-  onWinningTileChange,
+  ids,
+  recognition,
+  selectedTileId,
+  onSelect,
+  onChange,
+  onTileChange,
+  onRemove,
 }: {
   title: string;
-  tiles: TileId[];
-  winningTile: TileId;
-  onTilesChange: (tiles: TileId[]) => void;
-  onWinningTileChange: (tile: TileId) => void;
+  ids: number[];
+  recognition: RecognitionResult;
+  selectedTileId: number | null;
+  onSelect: (id: number | null) => void;
+  onChange: (ids: number[]) => void;
+  onTileChange: (id: number, tile: TileId) => void;
+  onRemove: (id: number) => void;
 }) {
   return (
     <div className="rack">
       <div className="rack-heading">
         <h3>{title}</h3>
-        <TileSelect
-          label="添加"
-          onPick={(tile) => onTilesChange([...tiles, tile])}
-        />
+        <span className="meta">{ids.length}</span>
       </div>
       <div className="tile-row">
-        {tiles.map((tile, index) => (
-          <div className="tile-edit" key={`${title}-${tile}-${index}`}>
-            <TileBadge
-              selected={winningTile === tile}
-              tile={tile}
-              onClick={() => onWinningTileChange(tile)}
-            />
-            <select
-              aria-label="修改牌"
-              value={tile}
-              onChange={(event) => {
-                const next = [...tiles];
-                next[index] = event.currentTarget.value as TileId;
-                onTilesChange(next);
-              }}
-            >
-              {SCORING_TILE_IDS.map((option) => (
-                <option key={option} value={option}>
-                  {tileLabel(option)}
-                </option>
-              ))}
-            </select>
-            <div className="mini-actions">
-              <button
-                type="button"
-                title="左移"
-                onClick={() => onTilesChange(move(tiles, index, -1))}
-              >
-                ‹
-              </button>
-              <button
-                type="button"
-                title="右移"
-                onClick={() => onTilesChange(move(tiles, index, 1))}
-              >
-                ›
-              </button>
-              <button
-                type="button"
-                title="删除"
-                onClick={() => onTilesChange(tiles.filter((_, i) => i !== index))}
-              >
-                ×
-              </button>
-            </div>
-          </div>
+        {ids.map((id, index) => (
+          <EditableTile
+            id={id}
+            key={id}
+            recognition={recognition}
+            selected={selectedTileId === id}
+            onSelect={onSelect}
+            onTileChange={onTileChange}
+            onRemove={onRemove}
+            onMove={(direction) => onChange(move(ids, index, direction))}
+          />
         ))}
+      </div>
+    </div>
+  );
+}
+
+function EditableTile({
+  id,
+  recognition,
+  selected,
+  onSelect,
+  onTileChange,
+  onRemove,
+  onMove,
+}: {
+  id: number;
+  recognition: RecognitionResult;
+  selected: boolean;
+  onSelect: (id: number | null) => void;
+  onTileChange: (id: number, tile: TileId) => void;
+  onRemove: (id: number) => void;
+  onMove?: (direction: -1 | 1) => void;
+}) {
+  const tile = recognition.detections.find((candidate) => candidate.id === id);
+  if (!tile) return null;
+
+  return (
+    <div className="tile-edit">
+      <TileBadge selected={selected} tile={tile.tile_id} onClick={() => onSelect(id)} />
+      <select
+        aria-label="Change tile"
+        value={tile.tile_id}
+        onChange={(event) => onTileChange(id, event.currentTarget.value as TileId)}
+      >
+        {SCORING_TILE_IDS.map((option) => (
+          <option key={option} value={option}>
+            {tileLabel(option)}
+          </option>
+        ))}
+      </select>
+      <div className="mini-actions">
+        <button type="button" title="Move left" disabled={!onMove} onClick={() => onMove?.(-1)}>
+          &lt;
+        </button>
+        <button type="button" title="Move right" disabled={!onMove} onClick={() => onMove?.(1)}>
+          &gt;
+        </button>
+        <button type="button" title="Remove" onClick={() => onRemove(id)}>
+          x
+        </button>
       </div>
     </div>
   );
 }
 
 function MeldEditor({
-  melds,
+  recognition,
+  selectedTileId,
+  onSelect,
   onChange,
 }: {
-  melds: MeldInput[];
-  onChange: (melds: MeldInput[]) => void;
+  recognition: RecognitionResult;
+  selectedTileId: number | null;
+  onSelect: (id: number | null) => void;
+  onChange: (recognition: RecognitionResult) => void;
 }) {
   return (
     <div className="rack">
       <div className="rack-heading">
-        <h3>副露</h3>
+        <h3>Melds</h3>
         <button
           type="button"
+          disabled={selectedTileId === null}
           onClick={() =>
-            onChange([...melds, { kind: "pon", tiles: ["5z", "5z", "5z"] }])
+            selectedTileId !== null && onChange(assignTile(recognition, selectedTileId, { kind: "new-meld" }))
           }
         >
-          添加副露
+          New meld
         </button>
       </div>
       <div className="meld-list">
-        {melds.map((meld, meldIndex) => (
-          <div className="meld-row" key={`meld-${meldIndex}`}>
-            <select
-              aria-label="副露类型"
-              value={meld.kind}
-              onChange={(event) => {
-                const next = [...melds];
-                next[meldIndex] = {
-                  ...meld,
-                  kind: event.currentTarget.value as MeldKind,
-                };
-                onChange(next);
-              }}
-            >
-              <option value="chi">吃</option>
-              <option value="pon">碰</option>
-              <option value="daiminkan">明杠</option>
-              <option value="ankan">暗杠</option>
-            </select>
-            {meld.tiles.map((tile, tileIndex) => (
-              <select
-                aria-label="副露牌"
-                key={`${meldIndex}-${tileIndex}`}
-                value={tile}
-                onChange={(event) => {
-                  const next = [...melds];
-                  const tiles = [...meld.tiles];
-                  tiles[tileIndex] = event.currentTarget.value as TileId;
-                  next[meldIndex] = { ...meld, tiles };
-                  onChange(next);
-                }}
-              >
-                {SCORING_TILE_IDS.map((option) => (
-                  <option key={option} value={option}>
-                    {tileLabel(option)}
-                  </option>
-                ))}
-              </select>
-            ))}
-            <TileSelect
-              label="+"
-              onPick={(tile) => {
-                const next = [...melds];
-                next[meldIndex] = { ...meld, tiles: [...meld.tiles, tile] };
-                onChange(next);
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => onChange(melds.filter((_, i) => i !== meldIndex))}
-            >
-              删除
-            </button>
-          </div>
+        {recognition.layout.naki.map((meld) => (
+          <MeldRow
+            key={meld.id}
+            meld={meld}
+            recognition={recognition}
+            selectedTileId={selectedTileId}
+            onSelect={onSelect}
+            onChange={onChange}
+          />
         ))}
       </div>
     </div>
   );
 }
 
-function TileSelect({
-  label,
-  onPick,
+function MeldRow({
+  meld,
+  recognition,
+  selectedTileId,
+  onSelect,
+  onChange,
 }: {
-  label: string;
-  onPick: (tile: TileId) => void;
+  meld: RecognitionMeld;
+  recognition: RecognitionResult;
+  selectedTileId: number | null;
+  onSelect: (id: number | null) => void;
+  onChange: (recognition: RecognitionResult) => void;
 }) {
+  function updateMeld(nextMeld: RecognitionMeld) {
+    onChange({
+      ...recognition,
+      layout: {
+        ...recognition.layout,
+        naki: recognition.layout.naki.map((candidate) =>
+          candidate.id === meld.id ? nextMeld : candidate,
+        ),
+      },
+    });
+  }
+
   return (
-    <select
-      aria-label={label}
-      defaultValue=""
-      onChange={(event) => {
-        const tile = event.currentTarget.value as TileId;
-        if (tile) {
-          onPick(tile);
-          event.currentTarget.value = "";
+    <div className={`meld-row${meld.needs_confirmation ? " needs-confirmation" : ""}`}>
+      <select
+        aria-label="Meld type"
+        value={meld.kind}
+        onChange={(event) =>
+          updateMeld({
+            ...meld,
+            kind: event.currentTarget.value as RecognitionMeldKind,
+            needs_confirmation: event.currentTarget.value === "unknown",
+          })
         }
-      }}
-    >
-      <option value="" disabled>
-        {label}
-      </option>
-      {SCORING_TILE_IDS.map((tile) => (
-        <option key={tile} value={tile}>
-          {tileLabel(tile)}
-        </option>
+      >
+        <option value="unknown">Unknown</option>
+        <option value="chi">Chi</option>
+        <option value="pon">Pon</option>
+        <option value="daiminkan">Open kan</option>
+        <option value="ankan">Closed kan</option>
+      </select>
+      {meld.tiles.map((id, index) => (
+        <EditableTile
+          id={id}
+          key={id}
+          recognition={recognition}
+          selected={selectedTileId === id}
+          onSelect={onSelect}
+          onTileChange={(tileId, tile) => updateTile(recognition, tileId, tile, onChange)}
+          onRemove={(tileId) => onChange(assignTile(recognition, tileId, { kind: "unassigned" }))}
+          onMove={(direction) => updateMeld({ ...meld, tiles: move(meld.tiles, index, direction) })}
+        />
       ))}
-    </select>
+      <button
+        type="button"
+        disabled={selectedTileId === null}
+        onClick={() =>
+          selectedTileId !== null &&
+          onChange(assignTile(recognition, selectedTileId, { kind: "meld", meldId: meld.id }))
+        }
+      >
+        Add selected
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          onChange({
+            ...recognition,
+            layout: {
+              ...recognition.layout,
+              naki: recognition.layout.naki.filter((candidate) => candidate.id !== meld.id),
+              unassigned: [...recognition.layout.unassigned, ...meld.tiles],
+            },
+          })
+        }
+      >
+        Delete
+      </button>
+    </div>
   );
+}
+
+type AssignmentTarget =
+  | { kind: "closed" }
+  | { kind: "winning" }
+  | { kind: "unassigned" }
+  | { kind: "new-meld" }
+  | { kind: "meld"; meldId: string };
+
+function assignTile(
+  recognition: RecognitionResult,
+  tileId: number,
+  target: AssignmentTarget,
+): RecognitionResult {
+  const layout = recognition.layout;
+  const nextNaki = layout.naki.map((meld) => ({
+    ...meld,
+    tiles: meld.tiles.filter((id) => id !== tileId),
+  }));
+  const nextLayout = {
+    ...layout,
+    hand: layout.hand.filter((id) => id !== tileId),
+    hora: layout.hora === tileId ? null : layout.hora,
+    naki: nextNaki,
+    unassigned: layout.unassigned.filter((id) => id !== tileId),
+  };
+
+  if (target.kind === "closed") {
+    nextLayout.hand = [...nextLayout.hand, tileId];
+  } else if (target.kind === "winning") {
+    if (nextLayout.hora !== null) {
+      nextLayout.unassigned = [...nextLayout.unassigned, nextLayout.hora];
+    }
+    nextLayout.hora = tileId;
+  } else if (target.kind === "unassigned") {
+    nextLayout.unassigned = [...nextLayout.unassigned, tileId];
+  } else if (target.kind === "new-meld") {
+    nextLayout.naki = [
+      ...nextLayout.naki,
+      {
+        id: `meld_${Date.now()}`,
+        kind: "unknown",
+        tiles: [tileId],
+        needs_confirmation: true,
+      },
+    ];
+  } else {
+    nextLayout.naki = nextLayout.naki.map((meld) =>
+      meld.id === target.meldId ? { ...meld, tiles: [...meld.tiles, tileId] } : meld,
+    );
+  }
+
+  return { ...recognition, layout: nextLayout };
+}
+
+function updateTile(
+  recognition: RecognitionResult,
+  tileId: number,
+  tile: TileId,
+  onChange: (recognition: RecognitionResult) => void,
+) {
+  onChange({
+    ...recognition,
+    detections: recognition.detections.map((candidate) =>
+      candidate.id === tileId ? { ...candidate, tile_id: tile } : candidate,
+    ),
+  });
+}
+
+function deleteTile(recognition: RecognitionResult, tileId: number): RecognitionResult {
+  return {
+    ...recognition,
+    detections: recognition.detections.filter((tile) => tile.id !== tileId),
+    layout: {
+      ...recognition.layout,
+      hand: recognition.layout.hand.filter((id) => id !== tileId),
+      hora: recognition.layout.hora === tileId ? null : recognition.layout.hora,
+      naki: recognition.layout.naki
+        .map((meld) => ({ ...meld, tiles: meld.tiles.filter((id) => id !== tileId) }))
+        .filter((meld) => meld.tiles.length > 0),
+      unassigned: recognition.layout.unassigned.filter((id) => id !== tileId),
+    },
+  };
+}
+
+function tileMap(recognition: RecognitionResult) {
+  return new Map(recognition.detections.map((tile) => [tile.id, tile]));
 }
 
 function move<T>(items: T[], index: number, direction: -1 | 1): T[] {

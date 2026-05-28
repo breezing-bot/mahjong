@@ -53,21 +53,31 @@ export interface BBox {
 }
 
 export interface Detection {
+  id: number;
   tile_id: TileId;
   confidence: number;
   bbox: BBox;
 }
 
+export type RecognitionMeldKind = "chi" | "pon" | "daiminkan" | "ankan" | "unknown";
+
+export interface RecognitionMeld {
+  id: string;
+  kind: RecognitionMeldKind;
+  tiles: number[];
+  needs_confirmation: boolean;
+}
+
+export interface RecognitionLayout {
+  hand: number[];
+  hora: number | null;
+  naki: RecognitionMeld[];
+  unassigned: number[];
+}
+
 export interface RecognitionResult {
   detections: Detection[];
-  hand_tiles: TileId[];
-  quality_flags: string[];
-  diagnostics: {
-    raw_detection_count: number;
-    kept_detection_count: number;
-    dropped_low_confidence_count: number;
-    dropped_unknown_class_count: number;
-  };
+  layout: RecognitionLayout;
 }
 
 export type MeldKind = "chi" | "pon" | "daiminkan" | "ankan";

@@ -185,7 +185,9 @@ input {
   position: absolute;
   border: 2px solid #35b779;
   background: rgba(53, 183, 121, 0.1);
-  pointer-events: none;
+  min-height: 0;
+  padding: 0;
+  cursor: pointer;
 }
 
 .detection-box span {
@@ -200,6 +202,31 @@ input {
   white-space: nowrap;
 }
 
+.detection-closed {
+  border-color: #35b779;
+  background: rgba(53, 183, 121, 0.1);
+}
+
+.detection-winning {
+  border-color: #f6c343;
+  background: rgba(246, 195, 67, 0.18);
+}
+
+.detection-meld {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.14);
+}
+
+.detection-unassigned {
+  border-color: #f97316;
+  background: rgba(249, 115, 22, 0.14);
+}
+
+.detection-selected {
+  outline: 3px solid #ffffff;
+  outline-offset: 1px;
+}
+
 .quality-row,
 .result-empty {
   margin-top: 10px;
@@ -210,6 +237,27 @@ input {
 .rack {
   border-top: 1px solid #edf0f4;
   padding-top: 12px;
+}
+
+.assignment-bar {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 10px;
+  border: 1px solid #edf0f4;
+  border-radius: 8px;
+  background: #fbfcfd;
+}
+
+.assignment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.muted-text {
+  color: #657080;
+  font-size: 13px;
 }
 
 .rack:first-of-type {
@@ -301,6 +349,11 @@ input {
   border: 1px solid #edf0f4;
   border-radius: 8px;
   background: #fbfcfd;
+}
+
+.meld-row.needs-confirmation {
+  border-color: #f6c343;
+  background: #fff9e8;
 }
 
 .settings-grid {
