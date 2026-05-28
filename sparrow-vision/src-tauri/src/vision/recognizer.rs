@@ -31,21 +31,32 @@ mod debug_tests {
   use std::env;
   use std::fs;
   use std::path::{Path, PathBuf};
+  use std::time::Duration;
+  use std::time::Instant;
   use tract_onnx::prelude::tract_ndarray::{ArrayD, ArrayViewD};
 
   #[test]
   #[ignore = "set SPARROW_VISION_DEBUG_IMAGE to an image path and run with --ignored --nocapture"]
-  fn debug_model_output_for_image() {
+  fn debug_recognition_for_image() {
     let Some(image_path) = debug_image_path() else {
       print_missing_image_help();
       return;
     };
 
-    let (_, input, letterbox, model_output) = run_model_for_debug(&image_path);
-
+    let debug_run = run_model_for_debug(&image_path);
+    let DebugRun {
+      image_bytes,
+      input,
+      letterbox,
+      model_output,
+      model_load_duration,
+      inference_duration,
+    } = debug_run;
     println!("image_path={}", image_path.display());
     println!("letterbox={letterbox:?}");
     println!("input_len={}", input.len());
+    println!("model_load_ms={:.2}", duration_ms(model_load_duration));
+    println!("inference_ms={:.2}", duration_ms(inference_duration));
     println!("model_output_shape={:?}", model_output.shape());
     println!("model_output_stats={:?}", stats(model_output.iter().copied()));
     println!(
@@ -53,48 +64,20 @@ mod debug_tests {
       model_output.iter().take(24).copied().collect::<Vec<_>>()
     );
     print_detection_rows(&model_output.view());
-  }
-
-  #[test]
-  #[ignore = "set SPARROW_VISION_DEBUG_IMAGE to an image path and run with --ignored --nocapture"]
-  fn debug_output_to_recognition_result_for_image() {
-    let Some(image_path) = debug_image_path() else {
-      print_missing_image_help();
-      return;
-    };
-
-    let (_, _, letterbox, model_output) = run_model_for_debug(&image_path);
-    print_detection_rows(&model_output.view());
 
     let detections = yolo::parse_output(&model_output.view(), &letterbox, super::super::CONFIDENCE_THRESHOLD);
-    println!("detection_count={}", detections.len());
+    let layout = hand::infer_layout(&detections);
+    let result = output::recognition_result(detections, layout);
+    println!("detection_count={}", result.detections.len());
     println!(
       "detections_sample={:#?}",
-      detections.iter().take(16).collect::<Vec<_>>()
+      result.detections.iter().take(16).collect::<Vec<_>>()
     );
-
-    let layout = hand::infer_layout(&detections);
-    println!("layout={layout:#?}");
-
-    let result = output::recognition_result(detections, layout);
+    println!("layout={:#?}", result.layout);
     println!(
       "recognition_result_json={}",
       serde_json::to_string_pretty(&result).unwrap()
     );
-  }
-
-  #[test]
-  #[ignore = "set SPARROW_VISION_DEBUG_IMAGE to an image path and run with --ignored --nocapture"]
-  fn debug_save_annotated_recognition_image() {
-    let Some(image_path) = debug_image_path() else {
-      print_missing_image_help();
-      return;
-    };
-
-    let (image_bytes, _, letterbox, model_output) = run_model_for_debug(&image_path);
-    let detections = yolo::parse_output(&model_output.view(), &letterbox, super::super::CONFIDENCE_THRESHOLD);
-    let layout = hand::infer_layout(&detections);
-    let result = output::recognition_result(detections, layout);
 
     let mut annotated = image::load_from_memory(&image_bytes)
       .unwrap_or_else(|err| panic!("failed to decode {}: {err}", image_path.display()))
@@ -108,13 +91,72 @@ mod debug_tests {
       .save(&output_path)
       .unwrap_or_else(|err| panic!("failed to save {}: {err}", output_path.display()));
 
-    println!("image_path={}", image_path.display());
     println!("annotated_output_path={}", output_path.display());
-    println!("detection_count={}", result.detections.len());
-    println!("layout={:#?}", result.layout);
   }
 
-  fn run_model_for_debug(image_path: &Path) -> (Vec<u8>, Vec<f32>, preprocess::Letterbox, ArrayD<f32>) {
+  #[test]
+  #[ignore = "set SPARROW_VISION_DEBUG_IMAGE to an image path and run with --ignored --nocapture"]
+  fn debug_warm_inference_timing_for_image() {
+    const MEASURED_RUNS: usize = 5;
+
+    let Some(image_path) = debug_image_path() else {
+      print_missing_image_help();
+      return;
+    };
+
+    let image_bytes =
+      fs::read(&image_path).unwrap_or_else(|err| panic!("failed to read {}: {err}", image_path.display()));
+    let image = image::load_from_memory(&image_bytes)
+      .unwrap_or_else(|err| panic!("failed to decode {}: {err}", image_path.display()));
+    let (input, letterbox) = preprocess::prepare_input(image);
+    let tensor = input_tensor(&input);
+    let model_path = model::source_model_path();
+
+    let model_load_started = Instant::now();
+    let model = model::load_model_from_path(model_path.clone(), super::super::INPUT_SIZE)
+      .unwrap_or_else(|err| panic!("failed to load {}: {err}", model_path.display()));
+    let model_load_duration = model_load_started.elapsed();
+
+    println!("image_path={}", image_path.display());
+    println!("letterbox={letterbox:?}");
+    println!("input_len={}", input.len());
+    println!("model_load_ms={:.2}", duration_ms(model_load_duration));
+    println!("warmup_runs=1");
+    println!("measured_runs={MEASURED_RUNS}");
+
+    let warmup_started = Instant::now();
+    let _ = model.run(tvec!(tensor.clone().into())).unwrap();
+    println!("warmup_inference_ms={:.2}", duration_ms(warmup_started.elapsed()));
+
+    let mut durations = Vec::with_capacity(MEASURED_RUNS);
+    for run_index in 1..=MEASURED_RUNS {
+      let inference_started = Instant::now();
+      let outputs = model.run(tvec!(tensor.clone().into())).unwrap();
+      let duration = inference_started.elapsed();
+      let output = outputs[0].to_array_view::<f32>().unwrap();
+      let detections = yolo::parse_output(&output, &letterbox, super::super::CONFIDENCE_THRESHOLD);
+
+      println!(
+        "inference_run_{run_index}_ms={:.2}, detection_count={}",
+        duration_ms(duration),
+        detections.len()
+      );
+      durations.push(duration);
+    }
+
+    println!("inference_avg_ms={:.2}", average_duration_ms(&durations));
+  }
+
+  struct DebugRun {
+    image_bytes: Vec<u8>,
+    input: Vec<f32>,
+    letterbox: preprocess::Letterbox,
+    model_output: ArrayD<f32>,
+    model_load_duration: Duration,
+    inference_duration: Duration,
+  }
+
+  fn run_model_for_debug(image_path: &Path) -> DebugRun {
     let image_bytes =
       fs::read(image_path).unwrap_or_else(|err| panic!("failed to read {}: {err}", image_path.display()));
     let image = image::load_from_memory(&image_bytes)
@@ -122,12 +164,23 @@ mod debug_tests {
     let (input, letterbox) = preprocess::prepare_input(image);
     let tensor = input_tensor(&input);
     let model_path = model::source_model_path();
+    let model_load_started = Instant::now();
     let model = model::load_model_from_path(model_path.clone(), super::super::INPUT_SIZE)
       .unwrap_or_else(|err| panic!("failed to load {}: {err}", model_path.display()));
+    let model_load_duration = model_load_started.elapsed();
+    let inference_started = Instant::now();
     let outputs = model.run(tvec!(tensor.into())).unwrap();
+    let inference_duration = inference_started.elapsed();
     let model_output = outputs[0].to_array_view::<f32>().unwrap().to_owned().into_dyn();
 
-    (image_bytes, input, letterbox, model_output)
+    DebugRun {
+      image_bytes,
+      input,
+      letterbox,
+      model_output,
+      model_load_duration,
+      inference_duration,
+    }
   }
 
   fn input_tensor(input: &[f32]) -> Tensor {
@@ -245,7 +298,7 @@ mod debug_tests {
             "  $env:SPARROW_VISION_DEBUG_IMAGE='D:\\\\WorkSpace\\\\Bot\\\\mahjong\\\\sparrow-vision\\\\src-tauri\\\\tests\\\\fixtures\\\\recognition\\\\images\\\\sample.jpg'"
         );
     println!("Then run:");
-    println!("  cargo test -p sparrow-vision debug_save_annotated_recognition_image -- --ignored --nocapture");
+    println!("  cargo test -p sparrow-vision debug_recognition_for_image -- --ignored --nocapture");
   }
 
   fn stats(values: impl Iterator<Item = f32>) -> (usize, f32, f32, f32) {
@@ -263,5 +316,16 @@ mod debug_tests {
 
     let mean = if count == 0 { 0.0 } else { sum / count as f32 };
     (count, min, max, mean)
+  }
+
+  fn duration_ms(duration: Duration) -> f64 {
+    duration.as_secs_f64() * 1000.0
+  }
+
+  fn average_duration_ms(durations: &[Duration]) -> f64 {
+    if durations.is_empty() {
+      return 0.0;
+    }
+    durations.iter().map(|duration| duration_ms(*duration)).sum::<f64>() / durations.len() as f64
   }
 }
