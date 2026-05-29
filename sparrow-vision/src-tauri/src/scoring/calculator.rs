@@ -1,6 +1,6 @@
 use super::{melds, yaku};
 use crate::types::{
-  AnalyzeHandRequest, RiichiInput, ScoringResult, SpecialWinInput, TsumoPoints, WinMethodInput, WindInput,
+  AnalyzeHandRequest, AnalyzeHandResult, RiichiInput, ScorePoints, SpecialWinInput, WinMethodInput, WindInput,
 };
 use riichi_calc::calculator::result::Points;
 use riichi_calc::constants::field::{Field, Wind};
@@ -10,23 +10,7 @@ use riichi_calc::parser::{Input, PiInput};
 use std::collections::HashSet;
 use std::str::FromStr;
 
-pub fn analyze_hand(request: AnalyzeHandRequest) -> ScoringResult {
-  match analyze_hand_inner(request) {
-    Ok(result) => result,
-    Err(error) => ScoringResult {
-      is_win: false,
-      yaku: Vec::new(),
-      han: 0,
-      fu: 0,
-      ron_points: None,
-      tsumo_points: None,
-      waits: Vec::new(),
-      errors: vec![error],
-    },
-  }
-}
-
-fn analyze_hand_inner(request: AnalyzeHandRequest) -> Result<ScoringResult, String> {
+pub fn analyze_hand(request: AnalyzeHandRequest) -> Result<AnalyzeHandResult, String> {
   let hand = parse_tiles(&request.hand)?;
   let naki = request
     .naki
@@ -73,16 +57,11 @@ fn analyze_hand_inner(request: AnalyzeHandRequest) -> Result<ScoringResult, Stri
   .calc_hand()
   .map_err(|err| format!("输入不是合法和牌形：{err:?}"))?;
 
-  let (ron_points, tsumo_points) = display_points(&output.score_result.actual_points);
-  Ok(ScoringResult {
-    is_win: true,
+  Ok(AnalyzeHandResult {
     yaku: yaku::flatten_yaku(&output.found_result),
     han: output.score_result.detail.han,
     fu: output.score_result.detail.fu,
-    ron_points,
-    tsumo_points,
-    waits: Vec::new(),
-    errors: Vec::new(),
+    points: display_points(&output.score_result.actual_points),
   })
 }
 
@@ -93,23 +72,17 @@ fn parse_tiles(tile_ids: &[String]) -> Result<Vec<Tile>, String> {
     .collect()
 }
 
-fn display_points(points: &Points) -> (Option<u32>, Option<TsumoPoints>) {
+fn display_points(points: &Points) -> ScorePoints {
   match points {
-    Points::Ron(value) => (Some(*value), None),
-    Points::ChildTumo(non_dealer, dealer) => (
-      None,
-      Some(TsumoPoints {
-        dealer: *dealer,
-        non_dealer: *non_dealer,
-      }),
-    ),
-    Points::DealerTumo(value) => (
-      None,
-      Some(TsumoPoints {
-        dealer: *value,
-        non_dealer: *value,
-      }),
-    ),
+    Points::Ron(value) => ScorePoints::Ron { points: *value },
+    Points::ChildTumo(non_dealer, dealer) => ScorePoints::Tsumo {
+      dealer: *dealer,
+      non_dealer: *non_dealer,
+    },
+    Points::DealerTumo(value) => ScorePoints::Tsumo {
+      dealer: *value,
+      non_dealer: *value,
+    },
   }
 }
 
@@ -188,12 +161,11 @@ mod tests {
 
   #[test]
   fn scores_simple_pinfu_riichi_ron() {
-    let result = analyze_hand(base_request());
+    let result = analyze_hand(base_request()).unwrap();
 
-    assert!(result.is_win, "{:?}", result.errors);
     assert!(result.han >= 1);
     assert!(result.fu >= 20);
-    assert!(result.ron_points.is_some());
+    assert!(matches!(result.points, ScorePoints::Ron { .. }));
   }
 
   #[test]
@@ -201,10 +173,9 @@ mod tests {
     let mut request = base_request();
     request.win_method = WinMethodInput::Tsumo;
 
-    let result = analyze_hand(request);
+    let result = analyze_hand(request).unwrap();
 
-    assert!(result.is_win, "{:?}", result.errors);
-    assert!(result.tsumo_points.is_some());
+    assert!(matches!(result.points, ScorePoints::Tsumo { .. }));
   }
 
   #[test]
@@ -212,10 +183,9 @@ mod tests {
     let mut request = base_request();
     request.hand.pop();
 
-    let result = analyze_hand(request);
+    let error = analyze_hand(request).unwrap_err();
 
-    assert!(!result.is_win);
-    assert!(result.errors[0].contains("HandValidationError"));
+    assert!(error.contains("HandValidationError"));
   }
 
   #[test]
@@ -242,7 +212,7 @@ mod tests {
 
     let result = analyze_hand(request);
 
-    assert!(result.is_win, "{:?}", result.errors);
+    assert!(result.is_ok(), "{:?}", result);
   }
 
   #[test]
@@ -252,6 +222,6 @@ mod tests {
 
     let result = analyze_hand(request);
 
-    assert!(result.is_win, "{:?}", result.errors);
+    assert!(result.is_ok(), "{:?}", result);
   }
 }

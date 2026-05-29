@@ -124,13 +124,13 @@ export interface AnalyzeHandRequest {
   ura_dora: TileId[];
 }
 
-export interface ScoringResult {
-  is_win: boolean;
-  yaku: Array<{ id: string; name: string; han: number }>;
+export type ScorePoints =
+  | { kind: "ron"; points: number }
+  | { kind: "tsumo"; dealer: number; non_dealer: number };
+
+export interface AnalyzeHandResult {
+  yaku: Array<{ name: string; han: number }>;
   han: number;
   fu: number;
-  ron_points: number | null;
-  tsumo_points: { dealer: number; non_dealer: number } | null;
-  waits: string[];
-  errors: string[];
+  points: ScorePoints;
 }

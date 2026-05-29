@@ -1,8 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   AnalyzeHandRequest,
+  AnalyzeHandResult,
   RecognitionResult,
-  ScoringResult,
 } from "./types";
 
 export async function recognizeImage(file: File): Promise<RecognitionResult> {
@@ -13,6 +13,6 @@ export async function recognizeImage(file: File): Promise<RecognitionResult> {
 
 export function analyzeHand(
   request: AnalyzeHandRequest,
-): Promise<ScoringResult> {
-  return invoke<ScoringResult>("analyze_hand", { request });
+): Promise<AnalyzeHandResult> {
+  return invoke<AnalyzeHandResult>("analyze_hand", { request });
 }

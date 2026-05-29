@@ -1,5 +1,5 @@
 use crate::scoring;
-use crate::types::{AnalyzeHandRequest, RecognitionResult, ScoringResult};
+use crate::types::{AnalyzeHandRequest, AnalyzeHandResult, RecognitionResult};
 use crate::vision;
 
 #[tauri::command]
@@ -8,6 +8,6 @@ pub fn recognize_image(app: tauri::AppHandle, image_bytes: Vec<u8>) -> Result<Re
 }
 
 #[tauri::command]
-pub fn analyze_hand(request: AnalyzeHandRequest) -> Result<ScoringResult, String> {
-  Ok(scoring::analyze_hand(request))
+pub fn analyze_hand(request: AnalyzeHandRequest) -> Result<AnalyzeHandResult, String> {
+  scoring::analyze_hand(request)
 }

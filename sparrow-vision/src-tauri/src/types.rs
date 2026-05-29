@@ -126,26 +126,22 @@ pub struct AnalyzeHandRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct YakuResult {
-  pub id: String,
+pub struct YakuSummary {
   pub name: String,
   pub han: u8,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TsumoPoints {
-  pub dealer: u32,
-  pub non_dealer: u32,
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ScorePoints {
+  Ron { points: u32 },
+  Tsumo { dealer: u32, non_dealer: u32 },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScoringResult {
-  pub is_win: bool,
-  pub yaku: Vec<YakuResult>,
+pub struct AnalyzeHandResult {
+  pub yaku: Vec<YakuSummary>,
   pub han: u8,
   pub fu: u8,
-  pub ron_points: Option<u32>,
-  pub tsumo_points: Option<TsumoPoints>,
-  pub waits: Vec<String>,
-  pub errors: Vec<String>,
+  pub points: ScorePoints,
 }

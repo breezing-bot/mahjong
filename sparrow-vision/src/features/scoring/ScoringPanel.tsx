@@ -1,7 +1,7 @@
 import type {
   AnalyzeHandRequest,
+  AnalyzeHandResult,
   RiichiInput,
-  ScoringResult,
   TileId,
   WindInput,
   WinMethodInput,
@@ -11,7 +11,8 @@ import { SCORING_TILE_IDS, tileLabel, WIND_OPTIONS } from "../../shared/tiles";
 
 interface ScoringPanelProps {
   request: AnalyzeHandRequest;
-  result: ScoringResult | null;
+  result: AnalyzeHandResult | null;
+  error: string | null;
   busy: boolean;
   onChange: (request: AnalyzeHandRequest) => void;
   onAnalyze: () => void;
@@ -20,6 +21,7 @@ interface ScoringPanelProps {
 export function ScoringPanel({
   request,
   result,
+  error,
   busy,
   onChange,
   onAnalyze,
@@ -107,7 +109,7 @@ export function ScoringPanel({
         </div>
       </div>
       <div className="settings-section special-win-section">
-        <h3>特殊胡法</h3>
+        <h3>特殊役状况</h3>
         <div className="toggle-grid">
           {[
             ["ippatsu", "一发"],
@@ -146,7 +148,7 @@ export function ScoringPanel({
         tiles={request.ura_dora}
         onChange={(tiles) => onChange({ ...request, ura_dora: tiles })}
       />
-      <ResultView result={result} />
+      <ResultView result={result} error={error} />
     </section>
   );
 }
@@ -198,18 +200,24 @@ function IndicatorEditor({
   );
 }
 
-function ResultView({ result }: { result: ScoringResult | null }) {
-  if (!result) {
-    return <div className="result-empty">等待计算</div>;
-  }
-  if (result.errors.length > 0) {
+function ResultView({
+  result,
+  error,
+}: {
+  result: AnalyzeHandResult | null;
+  error: string | null;
+}) {
+  if (error) {
     return (
       <div className="result error-result">
-        {result.errors.map((error) => (
-          <p key={error}>{error}</p>
+        {error.split("\n").map((line) => (
+          <p key={line}>{line}</p>
         ))}
       </div>
     );
+  }
+  if (!result) {
+    return <div className="result-empty">等待计算</div>;
   }
 
   return (
@@ -218,16 +226,16 @@ function ResultView({ result }: { result: ScoringResult | null }) {
         <strong>{result.han} 番</strong>
         <strong>{result.fu} 符</strong>
       </div>
-      {result.ron_points ? <p>荣和 {result.ron_points} 点</p> : null}
-      {result.tsumo_points ? (
+      {result.points.kind === "ron" ? (
+        <p>荣和 {result.points.points} 点</p>
+      ) : (
         <p>
-          自摸 庄家 {result.tsumo_points.dealer} / 闲家{" "}
-          {result.tsumo_points.non_dealer}
+          自摸 庄家 {result.points.dealer} / 闲家 {result.points.non_dealer}
         </p>
-      ) : null}
+      )}
       <div className="yaku-list">
-        {result.yaku.map((yaku) => (
-          <span key={yaku.id}>
+        {result.yaku.map((yaku, index) => (
+          <span key={`${yaku.name}-${index}`}>
             {yaku.name} {yaku.han}
           </span>
         ))}

@@ -3,39 +3,45 @@
   "$id": "mahjong.scoring-result.v1",
   "title": "AnalyzeHandResult",
   "type": "object",
-  "required": ["is_win", "yaku", "han", "fu", "ron_points", "tsumo_points", "waits", "errors"],
+  "required": ["yaku", "han", "fu", "points"],
   "properties": {
-    "is_win": { "type": "boolean" },
     "yaku": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "name", "han"],
+        "required": ["name", "han"],
         "properties": {
-          "id": { "type": "string" },
           "name": { "type": "string" },
           "han": { "type": "integer", "minimum": 0 }
-        }
+        },
+        "additionalProperties": false
       }
     },
     "han": { "type": "integer", "minimum": 0 },
     "fu": { "type": "integer", "minimum": 0 },
-    "ron_points": { "type": ["integer", "null"] },
-    "tsumo_points": {
-      "type": ["object", "null"],
-      "required": ["dealer", "non_dealer"],
-      "properties": {
-        "dealer": { "type": "integer" },
-        "non_dealer": { "type": "integer" }
-      }
-    },
-    "waits": {
-      "type": "array",
-      "items": { "type": "string" }
-    },
-    "errors": {
-      "type": "array",
-      "items": { "type": "string" }
+    "points": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "points"],
+          "properties": {
+            "kind": { "const": "ron" },
+            "points": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "dealer", "non_dealer"],
+          "properties": {
+            "kind": { "const": "tsumo" },
+            "dealer": { "type": "integer", "minimum": 0 },
+            "non_dealer": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        }
+      ]
     }
-  }
+  },
+  "additionalProperties": false
 }
