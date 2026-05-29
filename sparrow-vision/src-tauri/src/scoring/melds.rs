@@ -1,7 +1,7 @@
-use super::tiles::{normalize_red, parse_tile_id};
 use crate::types::{MeldInput, MeldKind};
 use riichi_calc::constants::hand::Mentsu;
 use riichi_calc::constants::tiles::{Tile, TileType};
+use std::str::FromStr;
 
 pub fn convert_meld(meld: &MeldInput) -> Result<Mentsu, String> {
   if meld.tiles.is_empty() {
@@ -10,7 +10,11 @@ pub fn convert_meld(meld: &MeldInput) -> Result<Mentsu, String> {
   let mut tiles = meld
     .tiles
     .iter()
-    .map(|tile| parse_tile_id(tile).map(normalize_red))
+    .map(|tile| {
+      Tile::from_str(tile)
+        .map(Tile::normalize_red)
+        .map_err(|err| format!("{err:?}"))
+    })
     .collect::<Result<Vec<_>, _>>()?;
 
   match meld.kind {

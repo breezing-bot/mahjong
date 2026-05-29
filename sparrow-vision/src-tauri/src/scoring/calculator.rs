@@ -1,4 +1,4 @@
-use super::{melds, tiles, yaku};
+use super::{melds, yaku};
 use crate::types::{
   AnalyzeHandRequest, RiichiInput, ScoringResult, SpecialWinInput, TsumoPoints, WinMethodInput, WindInput,
 };
@@ -8,6 +8,7 @@ use riichi_calc::constants::status::{RiichiStatus, SpecialWin, Status, WinMethod
 use riichi_calc::constants::tiles::Tile;
 use riichi_calc::parser::{Input, PiInput};
 use std::collections::HashSet;
+use std::str::FromStr;
 
 pub fn analyze_hand(request: AnalyzeHandRequest) -> ScoringResult {
   match analyze_hand_inner(request) {
@@ -35,19 +36,27 @@ fn analyze_hand_inner(request: AnalyzeHandRequest) -> Result<ScoringResult, Stri
   let dora = request
     .dora
     .iter()
-    .map(|tile| tiles::dora_from_indicator(tile))
+    .map(|tile| {
+      Tile::from_str(tile)
+        .map(Tile::dora_from_indicator)
+        .map_err(|err| format!("{err:?}"))
+    })
     .collect::<Result<Vec<_>, _>>()?;
   let ura_dora = request
     .ura_dora
     .iter()
-    .map(|tile| tiles::dora_from_indicator(tile))
+    .map(|tile| {
+      Tile::from_str(tile)
+        .map(Tile::dora_from_indicator)
+        .map_err(|err| format!("{err:?}"))
+    })
     .collect::<Result<Vec<_>, _>>()?;
 
   let output = Input::new(
     PiInput {
       hand,
       naki,
-      hora: tiles::parse_tile_id(&request.hora)?,
+      hora: Tile::from_str(&request.hora).map_err(|err| format!("{err:?}"))?,
     },
     Field {
       zikaze: wind(&request.zikaze),
@@ -78,7 +87,10 @@ fn analyze_hand_inner(request: AnalyzeHandRequest) -> Result<ScoringResult, Stri
 }
 
 fn parse_tiles(tile_ids: &[String]) -> Result<Vec<Tile>, String> {
-  tile_ids.iter().map(|tile| tiles::parse_tile_id(tile)).collect()
+  tile_ids
+    .iter()
+    .map(|tile| Tile::from_str(tile).map_err(|err| format!("{err:?}")))
+    .collect()
 }
 
 fn display_points(points: &Points) -> (Option<u32>, Option<TsumoPoints>) {
@@ -113,7 +125,7 @@ fn wind(wind: &WindInput) -> Wind {
 fn win_method(method: &WinMethodInput) -> WinMethod {
   match method {
     WinMethodInput::Ron => WinMethod::Ron,
-    WinMethodInput::Tsumo => WinMethod::Tumo,
+    WinMethodInput::Tsumo => WinMethod::Tsumo,
   }
 }
 
@@ -227,6 +239,16 @@ mod tests {
       dora: Vec::new(),
       ura_dora: Vec::new(),
     };
+
+    let result = analyze_hand(request);
+
+    assert!(result.is_win, "{:?}", result.errors);
+  }
+
+  #[test]
+  fn converts_dora_indicators_with_riichi_calc_tile_api() {
+    let mut request = base_request();
+    request.dora = vec!["9m".to_string(), "4z".to_string(), "7z".to_string()];
 
     let result = analyze_hand(request);
 

@@ -1,6 +1,5 @@
 mod calculator;
 mod melds;
-mod tiles;
 mod yaku;
 
 use crate::types::{AnalyzeHandRequest, ScoringResult};
