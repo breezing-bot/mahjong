@@ -1,4 +1,4 @@
-use super::{hand, model, output, preprocess, yolo};
+use super::{hand, model, preprocess, yolo};
 use crate::types::RecognitionResult;
 use ort::{inputs, value::TensorRef};
 use tauri::AppHandle;
@@ -16,7 +16,7 @@ pub fn recognize_image(image_bytes: &[u8], app: &AppHandle) -> Result<Recognitio
   let detections = yolo::parse_output(&output, &letterbox, super::CONFIDENCE_THRESHOLD);
   let layout = hand::infer_layout(&detections);
 
-  Ok(output::recognition_result(detections, layout))
+  Ok(RecognitionResult { detections, layout })
 }
 
 fn input_tensor(input: &[f32]) -> Result<TensorRef<'_, f32>, String> {
@@ -25,10 +25,6 @@ fn input_tensor(input: &[f32]) -> Result<TensorRef<'_, f32>, String> {
     input,
   ))
   .map_err(|err| err.to_string())
-}
-
-pub fn recognize_image_or_unavailable(image_bytes: &[u8], app: &AppHandle) -> RecognitionResult {
-  recognize_image(image_bytes, app).unwrap_or_else(|_| output::unavailable_result())
 }
 
 #[cfg(test)]
@@ -81,7 +77,7 @@ mod debug_tests {
 
     let detections = yolo::parse_output(&model_output.view(), &letterbox, super::super::CONFIDENCE_THRESHOLD);
     let layout = hand::infer_layout(&detections);
-    let result = output::recognition_result(detections, layout);
+    let result = RecognitionResult { detections, layout };
     println!("detection_count={}", result.detections.len());
     println!(
       "detections_sample={:#?}",

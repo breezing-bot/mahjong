@@ -76,15 +76,7 @@ function App() {
       setSelectedTileId(nextRecognition.layout.hora);
       setRequest((current) => requestFromRecognition(current, nextRecognition));
     } catch (error) {
-      setRecognition({
-        detections: [],
-        layout: {
-          hand: [],
-          hora: null,
-          naki: [],
-          unassigned: [],
-        },
-      });
+      setRecognition(null);
       setScoringError(errorMessage(error));
     } finally {
       setBusy("idle");
